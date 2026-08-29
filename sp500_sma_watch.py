@@ -1,11 +1,19 @@
-"""S&P 500 50/200 SMA watcher. Serves the HTML and runs live scans on button click."""
+"""S&P 500 50/200 SMA watcher.
+
+You do not need to copy files around. In Cursor we edit this project together.
+On a Mac, double-click Start_SP500_Watch.command
+On Windows, double-click Start_SP500_Watch.bat
+The first run installs packages by itself.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import socket
+import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -16,15 +24,80 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
+HERE = Path(__file__).resolve().parent
+HTML_PATH = HERE / "sp500_sma_watch.html"
+DATA_PATH = HERE / "sp500_sma_watch_data.json"
+REQS_PATH = HERE / "requirements.txt"
+VENV_DIR = HERE / ".venv"
+
+
+def _venv_python() -> Path:
+    if os.name == "nt":
+        return VENV_DIR / "Scripts" / "python.exe"
+    return VENV_DIR / "bin" / "python"
+
+
+def _have_packages() -> bool:
+    try:
+        import lxml  # noqa: F401
+        import pandas  # noqa: F401
+        import requests  # noqa: F401
+        import yfinance  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _install_into(python_exe: str | Path) -> None:
+    subprocess.check_call([str(python_exe), "-m", "pip", "install", "-q", "-r", str(REQS_PATH)])
+
+
+def ensure_packages() -> None:
+    """First run: make a local .venv if possible, otherwise install into this Python."""
+    if _have_packages():
+        return
+    if os.environ.get("FS2_SETUP_DONE") == "1":
+        print("Packages are still missing. Install Python 3 from https://www.python.org/downloads/")
+        raise SystemExit(1)
+    py = _venv_python()
+    try:
+        if not py.exists():
+            import shutil
+            import venv
+
+            print("First-time setup — creating a local environment (about a minute)...")
+            if VENV_DIR.exists():
+                shutil.rmtree(VENV_DIR, ignore_errors=True)
+            venv.EnvBuilder(with_pip=True).create(VENV_DIR)
+        if py.exists():
+            print("First-time setup — installing packages...")
+            _install_into(py)
+            if Path(sys.executable).resolve() != py.resolve():
+                env = os.environ.copy()
+                env["FS2_SETUP_DONE"] = "1"
+                os.execve(str(py), [str(py), *sys.argv], env)
+            return
+    except (Exception, SystemExit):
+        pass
+    print("First-time setup — installing packages into this Python...")
+    try:
+        _install_into(sys.executable)
+    except Exception as exc:
+        print("Could not finish setup. Install Python 3 from https://www.python.org/downloads/")
+        print(exc)
+        raise SystemExit(1)
+    env = os.environ.copy()
+    env["FS2_SETUP_DONE"] = "1"
+    os.execve(sys.executable, [sys.executable, *sys.argv], env)
+
+
+ensure_packages()
+
 import pandas as pd
 import requests
 import yfinance as yf
 
 warnings.filterwarnings("ignore")
-
-HERE = Path(__file__).resolve().parent
-HTML_PATH = HERE / "sp500_sma_watch.html"
-DATA_PATH = HERE / "sp500_sma_watch_data.json"
 
 CLOSE_PCT = 2.0
 RECENT_DAYS = 10
@@ -578,10 +651,11 @@ def make_handler(close_pct: float):
 
 
 def serve(close_pct: float, port: int, open_browser: bool, autoscan: bool = False) -> None:
-    try:
-        install_protocol()
-    except Exception as exc:
-        print("Could not register HTML launcher:", exc)
+    if os.name == "nt":
+        try:
+            install_protocol()
+        except Exception as exc:
+            print("Could not register HTML launcher:", exc)
 
     load_last()
     url = f"http://127.0.0.1:{port}/"
