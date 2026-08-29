@@ -237,7 +237,7 @@
         <input id="extras" type="text" placeholder="Extra tickers — SMCI, PLTR, ARM" autocomplete="off" />
         <button class="go" id="scanBtn" type="button" onclick="scanNow()">Scan live data</button>
       </div>
-      <div class="status" id="status">Just open this file to view. For a live scan, double-click Start_SP500_Watch.bat</div>
+      <div class="status" id="status">Just open this file to view. For a live scan on a Mac, double-click Start_SP500_Watch.command</div>
     </section>
 
     <section class="path" aria-label="Tag path from avoid to buy">
@@ -449,6 +449,8 @@
       bear: "Downtrend"
     };
     const EXTRA_KEY = "sp500_extra_tickers";
+    const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform) || /Mac OS X/.test(navigator.userAgent);
+    const LAUNCHER = IS_MAC ? "Start_SP500_Watch.command" : "Start_SP500_Watch.bat";
 
     function pct(v, min, max) {
       if (max <= min) return 50;
@@ -1106,7 +1108,7 @@
         return true;
       } catch {
         live = false;
-        setStatus("Viewing the last snapshot. For a live scan, double-click Start_SP500_Watch.bat", "warn");
+        setStatus("Viewing the last snapshot. For a live scan, double-click " + LAUNCHER, "warn");
         return false;
       }
     }
@@ -1142,7 +1144,7 @@
         }
         return true;
       }
-      alert("Could not start Python from the page.\n\nDouble-click Start_SP500_Watch.bat in the same folder.\nIf Windows showed a prompt, click Open and try again.");
+      alert("Could not start Python from the page.\n\nDouble-click " + LAUNCHER + " in the same folder.");
       return false;
     }
 
