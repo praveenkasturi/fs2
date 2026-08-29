@@ -237,7 +237,7 @@
         <input id="extras" type="text" placeholder="Extra tickers — SMCI, PLTR, ARM" autocomplete="off" />
         <button class="go" id="scanBtn" type="button" onclick="scanNow()">Scan live data</button>
       </div>
-      <div class="status" id="status">Checking watcher…</div>
+      <div class="status" id="status">Just open this file to view. For a live scan, double-click Start_SP500_Watch.bat</div>
     </section>
 
     <section class="path" aria-label="Tag path from avoid to buy">
@@ -1106,7 +1106,7 @@
         return true;
       } catch {
         live = false;
-        setStatus("Click Scan live data — it will start Python for you. If Windows asks, click Open.", "warn");
+        setStatus("Viewing the last snapshot. For a live scan, double-click Start_SP500_Watch.bat", "warn");
         return false;
       }
     }
