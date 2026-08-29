@@ -1,4 +1,7 @@
-pandas
-requests
-yfinance
-lxml
+# pandas must stay <3: the watcher passes raw HTML strings to pd.read_html(),
+# which pandas 3.x rejects (it treats the string as a file path).
+pandas==2.2.3
+numpy==2.4.4
+requests==2.33.1
+yfinance==1.7.0
+lxml==6.1.2
