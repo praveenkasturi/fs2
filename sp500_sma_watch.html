@@ -191,8 +191,140 @@
     table.uni tr.picked td { background: #1e2833; }
     table.uni .num { font-family: "IBM Plex Mono", monospace; }
     .grid { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-    .card { background: var(--card); box-shadow: var(--shadow); border-radius: 14px; padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 12px; max-width: 560px; cursor: pointer; }
+    .terminal {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      min-height: 520px;
+    }
+    .rail {
+      background: var(--card);
+      box-shadow: var(--shadow);
+      border-radius: 14px;
+      overflow: hidden;
+      position: sticky;
+      top: 10px;
+      max-height: calc(100vh - 24px);
+      display: flex;
+      flex-direction: column;
+    }
+    .rail-head {
+      padding: 10px 12px 8px;
+      border-bottom: 1px solid var(--stroke);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .rail-head b { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .rail-head span { color: var(--muted); font-size: 11px; font-family: "IBM Plex Mono", monospace; }
+    .rail-tools {
+      padding: 8px 10px 6px;
+      border-bottom: 1px solid var(--stroke);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .rail-search {
+      width: 100%;
+      background: var(--card-2);
+      border: 1px solid var(--stroke);
+      border-radius: 8px;
+      color: var(--text);
+      font: inherit;
+      font-size: 12px;
+      padding: 7px 9px;
+      outline: none;
+    }
+    .rail-search:focus { border-color: #3d5a73; }
+    .rail-search::placeholder { color: var(--muted); }
+    .rail-sort { display: flex; gap: 4px; flex-wrap: wrap; }
+    .rail-sort button {
+      background: transparent;
+      border: 1px solid var(--stroke);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 3px 8px;
+      font: inherit;
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .rail-sort button.on { background: #1e2833; color: var(--text); border-color: #3d5a73; }
+    .rail-list { overflow-y: auto; flex: 1; padding: 4px; }
+    .pick {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: 0;
+      color: inherit;
+      cursor: pointer;
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2px 10px;
+      font: inherit;
+    }
+    .pick:hover { background: var(--card-2); }
+    .pick.on { background: #1e2833; box-shadow: inset 0 0 0 1px #3d5a7333; }
+    .pick .t { font-weight: 700; letter-spacing: 0.04em; }
+    .pick .p { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); }
+    .pick .s { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; grid-column: 1 / -1; }
+    .pick .f { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); grid-column: 1 / -1; }
+    .desk {
+      min-width: 0;
+      position: sticky;
+      top: 10px;
+      max-height: calc(100vh - 24px);
+      overflow-y: auto;
+    }
+    .card {
+      background: var(--card);
+      box-shadow: var(--shadow);
+      border-radius: 14px;
+      padding: 14px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: none;
+      width: 100%;
+      cursor: default;
+    }
     .card.growth { box-shadow: 0 0 0 1px #5ee0b066; }
+    .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .card-nav { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+    .card-nav button {
+      background: var(--card-2);
+      border: 1px solid var(--stroke);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .card-nav button:hover { background: #243040; }
+    .card-nav button:disabled { opacity: 0.35; cursor: default; }
+    .card-body {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.15fr);
+      gap: 14px 18px;
+      align-items: start;
+    }
+    .card-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .card-col .metrics { grid-template-columns: 1fr 1fr; }
+    .card-col .metrics.plan { grid-template-columns: 1fr 1fr; }
+    .card-foot {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 4px;
+      border-top: 1px solid var(--stroke);
+    }
     .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
     .call { font-size: 10px; letter-spacing: 0.1em; font-weight: 700; margin-top: 3px; text-transform: uppercase; }
     .call-sub { font-size: 10px; letter-spacing: 0.08em; font-weight: 400; margin-top: 3px; text-transform: uppercase; }
@@ -290,9 +422,10 @@
     .NEAR_GOLDEN { background: #d4a01722; color: var(--gold); }
     .GOLDEN_TODAY { background: #3dbe8c22; color: var(--green); }
     .RECENT_GOLDEN { background: #5b8def22; color: var(--blue); }
+    .ticker { font-size: 22px; font-weight: 700; letter-spacing: 0.02em; }
     .price { font-family: "IBM Plex Mono", monospace; font-size: 20px; }
     .spark-wrap { position: relative; }
-    .spark { width: 100%; height: 42px; display: block; cursor: crosshair; }
+    .spark { width: 100%; height: 56px; display: block; cursor: crosshair; }
     .spark-tip { color: var(--muted); font-size: 11px; margin-top: 4px; font-family: "IBM Plex Mono", monospace; }
     .cap { color: var(--muted); font-size: 11px; line-height: 1.35; margin-top: -4px; }
     .track { position: relative; height: 44px; }
@@ -329,6 +462,9 @@
       .search { margin-left: 0; width: 100%; }
       .live-row { flex-wrap: wrap; }
       .go { flex: 1 1 100%; }
+      .terminal { grid-template-columns: 1fr; }
+      .rail, .desk { position: static; max-height: none; }
+      .card-body { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -662,7 +798,7 @@
       <input class="search" id="search" type="search" placeholder="Type a ticker or name — TSLA, NVDA…" autocomplete="off" />
     </div>
     <div class="chips" id="chips"></div>
-    <p class="hint"><strong>BUY THIS</strong> = every check green after a confirmed break: it owns a line, two closes above it, not stretched, dip reads clean, money not leaving, RSI sane. Click any name to see the checklist. <strong>BREAK WATCH</strong> = the walk-up before the break — still under the line, still not a buy.</p>
+    <p class="hint"><strong>BUY THIS</strong> = every check green after a confirmed break: it owns a line, two closes above it, not stretched, dip reads clean, money not leaving, RSI sane. Click a row to open the terminal desk. Switch names from the left list, or use ↑ ↓ / Esc. <strong>BREAK WATCH</strong> = the walk-up before the break — still under the line, still not a buy.</p>
     <details class="guide tape" id="tapeBox">
       <summary id="tapeSummary">Tape read <em>— click to expand</em></summary>
       <div class="thoughts" id="thoughts"></div>
@@ -1200,7 +1336,67 @@
       return { ok: false, plan: "No clean line in play. Wait for TEST (poke from below) or GAME ON (retest after a break)." };
     }
 
-    function card(d) {
+    function sortRailRows(rows) {
+      const key = railSort;
+      const dir = key === "name" || key === "ticker" ? 1 : -1;
+      return rows.slice().sort((a, b) => {
+        let av, bv;
+        if (key === "name") {
+          av = (a.name || a.ticker || "").toLowerCase();
+          bv = (b.name || b.ticker || "").toLowerCase();
+          return av < bv ? -dir : av > bv ? dir : 0;
+        }
+        if (key === "ticker") {
+          av = (a.ticker || "").toLowerCase();
+          bv = (b.ticker || "").toLowerCase();
+          return av < bv ? -dir : av > bv ? dir : 0;
+        }
+        av = a.market_cap == null ? -1 : a.market_cap;
+        bv = b.market_cap == null ? -1 : b.market_cap;
+        return (av - bv) * dir;
+      });
+    }
+
+    function filterRailRows(rows) {
+      const q = (railQuery || "").trim().toLowerCase();
+      if (!q) return rows;
+      return rows.filter(r =>
+        (r.ticker || "").toLowerCase().includes(q) ||
+        (r.name || "").toLowerCase().includes(q)
+      );
+    }
+
+    function pickList(rows, active, totalInFilter) {
+      const items = rows.map(d => {
+        const a = action(d);
+        const fc = flagCheck(d);
+        const pack = d.pack === "BUY" ? "BUY THIS" : d.pack === "WATCH" ? "BREAK WATCH" : "";
+        const flag = pack || (fc ? fc.label : "");
+        return `<button type="button" class="pick ${d.ticker === active ? "on" : ""}" data-ticker="${d.ticker}">
+          <span class="t">${d.ticker}</span>
+          <span class="p">$${d.price.toFixed(2)}</span>
+          <span class="s ${a.cls}">${a.tag}${earnSoon(d) ? " · EARN" : ""}</span>
+          ${flag ? `<span class="f">${flag}</span>` : ""}
+        </button>`;
+      }).join("");
+      const countTxt = rows.length === totalInFilter
+        ? String(rows.length)
+        : rows.length + " / " + totalInFilter;
+      return `<aside class="rail">
+        <div class="rail-head"><b>Watch list</b><span>${countTxt}</span></div>
+        <div class="rail-tools">
+          <input class="rail-search" id="railSearch" type="search" placeholder="Search ticker or name…" value="${(railQuery || "").replace(/"/g, "&quot;")}" autocomplete="off" />
+          <div class="rail-sort">
+            <button type="button" data-railsort="ticker" class="${railSort === "ticker" ? "on" : ""}">Ticker</button>
+            <button type="button" data-railsort="name" class="${railSort === "name" ? "on" : ""}">Name</button>
+            <button type="button" data-railsort="market_cap" class="${railSort === "market_cap" ? "on" : ""}">Mkt cap</button>
+          </div>
+        </div>
+        <div class="rail-list">${items || `<div class="empty" style="padding:24px 10px;font-size:12px">No match.</div>`}</div>
+      </aside>`;
+    }
+
+    function card(d, nav) {
       const gap = d.gap_pct;
       const gapTxt = (gap >= 0 ? "+" : "") + gap.toFixed(2) + "%";
       const a = action(d);
@@ -1245,40 +1441,56 @@
           <div class="m"><div class="k">Coil into line</div><div class="v" style="font-size:14px">${coil == null ? "—" : coil + " / 3"}</div></div>
         </div>
         <p class="cap">${d.obv_why || ""}${coil != null && d.coil_why ? " · " + d.coil_why + "." : ""}</p>`;
+      const i = nav ? nav.index : -1;
+      const n = nav ? nav.total : 0;
+      const navBox = `<div class="card-nav">
+          <button type="button" data-nav="prev" ${i <= 0 ? "disabled" : ""} title="Previous (↑)">↑</button>
+          <button type="button" data-nav="next" ${i < 0 || i >= n - 1 ? "disabled" : ""} title="Next (↓)">↓</button>
+          <button type="button" data-nav="close" title="Back to table (Esc)">Table</button>
+        </div>`;
       return `<article class="card ${d.signal === "GOLDEN_TODAY" ? "gold" : ""} ${a.tag === "GROWTH" ? "growth" : ""}">
-        <div class="row">
+        <div class="card-head">
           <div>
-            <div class="ticker">${d.ticker}</div>
+            <div class="row" style="justify-content:flex-start;gap:12px;align-items:center">
+              <div class="ticker">${d.ticker}</div>
+              <div class="price">$${d.price.toFixed(2)}</div>
+              <span class="badge ${d.signal}">${LABELS[d.signal]}</span>
+            </div>
             <div class="${a.cls} call">${a.tag}</div>
             ${isLong(d) ? `<div class="call-long call">LONG · ${hv.hold}</div>` : (hv.hold !== "none" ? `<div class="call-sub">${hv.hold}</div>` : "")}
-            <div class="name">${d.name || ""} ${d.sector ? "· " + d.sector : ""}</div>
+            ${earnTag(d)}
+            <div class="name">${d.name || ""} ${d.sector ? "· " + d.sector : ""} · ${REGIME[d.regime] || d.regime}${n ? " · " + (i + 1) + " / " + n : ""}</div>
           </div>
-          <span class="badge ${d.signal}">${LABELS[d.signal]}</span>
+          ${navBox}
         </div>
-        <div class="row">
-          <div class="price">$${d.price.toFixed(2)}</div>
-          <div class="name">${REGIME[d.regime] || d.regime}</div>
+        <div class="card-body">
+          <div class="card-col">
+            ${spark(d.spark)}
+            ${track(d)}
+            <p class="cap">Bar below the line is a ruler of today’s levels, not a time chart. Left = cheapest of Price / 50 / 200. Right = most expensive.</p>
+            <div class="metrics">
+              <div class="m"><div class="k">50 SMA</div><div class="v" style="color:var(--blue)">${d.sma50.toFixed(2)}</div></div>
+              <div class="m"><div class="k">200 SMA</div><div class="v" style="color:var(--red)">${d.sma200.toFixed(2)}</div></div>
+              <div class="m"><div class="k">Gap 50 vs 200</div><div class="v" style="color:${gap >= 0 ? "var(--green)" : "var(--red)"}">${gapTxt}<div style="font-size:11px;margin-top:2px">${(d.sma50 - d.sma200) >= 0 ? "+$" : "-$"}${Math.abs(d.sma50 - d.sma200).toFixed(2)}</div></div></div>
+              <div class="m"><div class="k">Mkt cap</div><div class="v">${fmtCap(d.market_cap)}</div></div>
+            </div>
+            <div>
+              <div class="row"><span class="name">RSI 14</span><span class="v" style="font-family:IBM Plex Mono,monospace;font-size:12px">${d.rsi == null ? "—" : d.rsi.toFixed(1)}</span></div>
+              ${rsiBar(d.rsi)}
+            </div>
+          </div>
+          <div class="card-col">
+            ${flowBox}
+            ${planBox}
+            ${dipBox}
+            ${earnBox}
+            ${verdictBox}
+          </div>
+          <div class="card-foot">
+            ${clockBox}
+            <p class="read"><strong>${a.tag}.</strong> ${a.why} ${d.blurb}</p>
+          </div>
         </div>
-        ${spark(d.spark)}
-        ${track(d)}
-        <p class="cap">Bar below the line is a ruler of today’s levels, not a time chart. Left = cheapest of Price / 50 / 200. Right = most expensive.</p>
-        <div class="metrics">
-          <div class="m"><div class="k">50 SMA</div><div class="v" style="color:var(--blue)">${d.sma50.toFixed(2)}</div></div>
-          <div class="m"><div class="k">200 SMA</div><div class="v" style="color:var(--red)">${d.sma200.toFixed(2)}</div></div>
-          <div class="m"><div class="k">Gap 50 vs 200</div><div class="v" style="color:${gap >= 0 ? "var(--green)" : "var(--red)"}">${gapTxt}<div style="font-size:11px;margin-top:2px">${(d.sma50 - d.sma200) >= 0 ? "+$" : "-$"}${Math.abs(d.sma50 - d.sma200).toFixed(2)}</div></div></div>
-          <div class="m"><div class="k">Mkt cap</div><div class="v">${fmtCap(d.market_cap)}</div></div>
-        </div>
-        <div>
-          <div class="row"><span class="name">RSI 14</span><span class="v" style="font-family:IBM Plex Mono,monospace;font-size:12px">${d.rsi == null ? "—" : d.rsi.toFixed(1)}</span></div>
-          ${rsiBar(d.rsi)}
-        </div>
-        ${flowBox}
-        ${planBox}
-        ${dipBox}
-        ${earnBox}
-        ${verdictBox}
-        ${clockBox}
-        <p class="read"><strong>${a.tag}.</strong> ${a.why} ${d.blurb}</p>
       </article>`;
     }
 
@@ -1288,6 +1500,10 @@
     let sortKey = "market_cap";
     let sortDir = -1;
     let selected = null;
+    let railQuery = "";
+    let railSort = "market_cap";
+    let railSearchFocus = false;
+    let railSearchCaret = null;
 
     const COLS = [
       { key: "ticker", label: "Ticker" },
@@ -1408,7 +1624,7 @@
         const mark = c.key === sortKey ? (sortDir === 1 ? " ▲" : " ▼") : "";
         return `<th data-key="${c.key}" class="${c.key === sortKey ? "on" : ""}">${c.label}${mark}${c.hint ? `<small>${c.hint}</small>` : ""}</th>`;
       }).join("");
-      return `<p class="name" style="margin:0 0 8px"><strong>Line</strong> = the dollar you are watching (support after a break, or the ceiling on a TEST). <strong>Days</strong> = how long since price last tagged it. <strong>Vs line</strong> = how far price is from that dollar now. <strong>Stop</strong> = leave if a daily close loses this. <strong>Flag</strong> = buy/leave the dip (GAME ON / RIZZ) or good/leave test (TEST / AVOID). <strong>Gap %</strong> = 50 vs 200 (green = 50 above, red = 50 below). <strong>Gap $</strong> = 50 minus 200 in dollars. Click a column to sort. Click a row for the card.</p>
+      return `<p class="name" style="margin:0 0 8px"><strong>Line</strong> = the dollar you are watching (support after a break, or the ceiling on a TEST). <strong>Days</strong> = how long since price last tagged it. <strong>Vs line</strong> = how far price is from that dollar now. <strong>Stop</strong> = leave if a daily close loses this. <strong>Flag</strong> = buy/leave the dip (GAME ON / RIZZ) or good/leave test (TEST / AVOID). <strong>Gap %</strong> = 50 vs 200 (green = 50 above, red = 50 below). <strong>Gap $</strong> = 50 minus 200 in dollars. Click a column to sort. Click a row to open the terminal desk (list left, detail right).</p>
       <div class="table-wrap"><table class="uni">
         <thead><tr>${heads}</tr></thead>
         <tbody>${rows.map(d => {
@@ -1606,36 +1822,78 @@
       }
 
       rows = sortRows(rows);
-      const picked = selected && (all.find(r => r.ticker === selected) || rows.find(r => r.ticker === selected));
-      grid.innerHTML = (picked ? card(picked) : "") + table(rows);
-      const tile = grid.querySelector("article.card");
-      if (tile) {
-        tile.title = "Click to close";
-        tile.onclick = () => { selected = null; render(); };
-        tile.querySelectorAll(".spark-wrap, .track").forEach(el => {
-          el.onclick = ev => ev.stopPropagation();
+      const picked = selected && (rows.find(r => r.ticker === selected) || all.find(r => r.ticker === selected));
+      let railBase = picked && !rows.some(r => r.ticker === picked.ticker)
+        ? [picked].concat(rows)
+        : rows;
+      railBase = sortRailRows(railBase);
+      const railRows = filterRailRows(railBase);
+      const idx = picked ? railRows.findIndex(r => r.ticker === picked.ticker) : -1;
+
+      if (picked) {
+        grid.innerHTML = `<div class="terminal">${pickList(railRows, picked.ticker, railBase.length)}<div class="desk">${card(picked, { index: Math.max(idx, 0), total: railRows.length || 1 })}</div></div>`;
+        const onPick = t => { selected = t; render(); };
+        grid.querySelectorAll(".pick").forEach(btn => {
+          btn.onclick = () => onPick(btn.dataset.ticker);
         });
-        bindSparkHover(tile);
-      }
-      grid.querySelectorAll("th[data-key]").forEach(th => {
-        th.onclick = ev => {
-          ev.stopPropagation();
-          const key = th.dataset.key;
-          if (sortKey === key) sortDir *= -1;
-          else {
-            sortKey = key;
-            sortDir = (key === "ticker" || key === "name" || key === "signal") ? 1 : -1;
+        grid.querySelectorAll("[data-railsort]").forEach(btn => {
+          btn.onclick = () => {
+            railSort = btn.dataset.railsort;
+            render();
+            const after = document.querySelector(".rail-list");
+            if (after) after.scrollTop = 0;
+          };
+        });
+        const railSearch = grid.querySelector("#railSearch");
+        if (railSearch) {
+          railSearch.oninput = () => {
+            railQuery = railSearch.value;
+            railSearchFocus = true;
+            railSearchCaret = railSearch.selectionStart;
+            render();
+            const after = document.querySelector(".rail-list");
+            if (after) after.scrollTop = 0;
+          };
+          if (railSearchFocus) {
+            railSearch.focus();
+            const pos = railSearchCaret == null ? railSearch.value.length : railSearchCaret;
+            try { railSearch.setSelectionRange(pos, pos); } catch (e) {}
+            railSearchFocus = false;
           }
-          render();
-        };
-      });
-      grid.querySelectorAll("tr[data-ticker]").forEach(tr => {
-        tr.onclick = () => {
-          const t = tr.dataset.ticker;
-          selected = selected === t ? null : t;
-          render();
-        };
-      });
+        }
+        const desk = grid.querySelector(".desk");
+        desk.querySelectorAll("[data-nav]").forEach(btn => {
+          btn.onclick = () => {
+            const act = btn.dataset.nav;
+            if (act === "close") { selected = null; railQuery = ""; render(); return; }
+            if (act === "prev" && idx > 0) { selected = railRows[idx - 1].ticker; render(); return; }
+            if (act === "next" && idx >= 0 && idx < railRows.length - 1) { selected = railRows[idx + 1].ticker; render(); }
+          };
+        });
+        bindSparkHover(desk);
+        grid._rail = railRows;
+      } else {
+        grid.innerHTML = table(rows);
+        grid._rail = rows;
+        grid.querySelectorAll("th[data-key]").forEach(th => {
+          th.onclick = ev => {
+            ev.stopPropagation();
+            const key = th.dataset.key;
+            if (sortKey === key) sortDir *= -1;
+            else {
+              sortKey = key;
+              sortDir = (key === "ticker" || key === "name" || key === "signal") ? 1 : -1;
+            }
+            render();
+          };
+        });
+        grid.querySelectorAll("tr[data-ticker]").forEach(tr => {
+          tr.onclick = () => {
+            selected = tr.dataset.ticker;
+            render();
+          };
+        });
+      }
     }
 
     function renderMethod(data) {
@@ -1885,6 +2143,26 @@
       if (saved) document.getElementById("extras").value = saved;
       document.getElementById("scanBtn").onclick = scanNow;
       document.getElementById("search").addEventListener("input", render);
+      document.addEventListener("keydown", ev => {
+        if (ev.target && (ev.target.tagName === "INPUT" || ev.target.tagName === "TEXTAREA")) return;
+        const grid = document.getElementById("grid");
+        const rail = grid && grid._rail;
+        if (!rail || !rail.length) return;
+        if (ev.key === "Escape" && selected) {
+          selected = null;
+          render();
+          return;
+        }
+        if (!selected) return;
+        const i = rail.findIndex(r => r.ticker === selected);
+        if (ev.key === "ArrowDown" || ev.key === "j") {
+          ev.preventDefault();
+          if (i < rail.length - 1) { selected = rail[i + 1].ticker; render(); }
+        } else if (ev.key === "ArrowUp" || ev.key === "k") {
+          ev.preventDefault();
+          if (i > 0) { selected = rail[i - 1].ticker; render(); }
+        }
+      });
       document.querySelectorAll(".flow [data-s]").forEach(el => {
         el.addEventListener("click", () => { filter = el.dataset.s; render(); });
       });
