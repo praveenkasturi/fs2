@@ -75,6 +75,11 @@
     .verdict.buy { background: #3dbe8c22; box-shadow: inset 0 0 0 1px #3dbe8c66; color: #cdeadd; }
     .verdict.watch { background: #e0704822; box-shadow: inset 0 0 0 1px #e0704866; color: #f2cbbb; }
     .verdict.none { background: var(--bg-2); box-shadow: inset 0 0 0 1px var(--stroke); color: var(--muted); }
+    .verdict.earn { background: #e0b04822; box-shadow: inset 0 0 0 1px #e0b04866; color: #f0dcb4; }
+    .earn-tag { display: inline-block; margin-top: 3px; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+                font-weight: 700; padding: 2px 6px; border-radius: 999px; background: #e0b04826; color: #e8c46a; }
+    .tab.earn-off { color: #e8c46a; }
+    .tab.earn-off.on { background: #e8c46a; color: #111; }
     .checklist { margin-top: 8px; }
     .chk-top { color: var(--muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
     .checklist ul { list-style: none; display: grid; gap: 4px; }
@@ -812,6 +817,22 @@
       unknown: "No volume read"
     };
 
+    function earnSoon(d) {
+      return d.earnings_soon === true;
+    }
+
+    function earnWords(d) {
+      const n = d.earnings_in;
+      if (n == null) return "";
+      if (n === 0) return "reports today";
+      if (n === 1) return "reports tomorrow";
+      return "reports in " + n + " days";
+    }
+
+    function earnTag(d) {
+      return earnSoon(d) ? `<div class="earn-tag">${earnWords(d)}</div>` : "";
+    }
+
     function obvFilterKey(d) {
       return "OBV_" + obvRank(d).toUpperCase() + "_" + (priceDir(d) === "up" ? "UP" : "DOWN");
     }
@@ -1209,6 +1230,9 @@
         : d.pack === "WATCH"
           ? `<div class="verdict watch"><b>Break watch — not a buy</b>${d.pack_why || ""}</div>`
           : (d.pack_why ? `<div class="verdict none"><b>Not a buy yet</b>${d.pack_why}</div>${packChecks(d)}` : "");
+      const earnBox = earnSoon(d)
+        ? `<div class="verdict earn"><b>Earnings ${earnWords(d)}</b>The chart cannot see the number. A good setup can gap straight through your stop overnight, so either size small or wait for the print. Date is from Yahoo — confirm it before you act.</div>`
+        : "";
       const rank = obvRank(d);
       const rankClr = rank === "best" ? "var(--growth)" : rank === "ok" ? "var(--amber)" : rank === "leave" ? "var(--red)" : "var(--muted)";
       const run = d.line_run;
@@ -1251,6 +1275,7 @@
         ${flowBox}
         ${planBox}
         ${dipBox}
+        ${earnBox}
         ${verdictBox}
         ${clockBox}
         <p class="read"><strong>${a.tag}.</strong> ${a.why} ${d.blurb}</p>
@@ -1258,6 +1283,7 @@
     }
 
     let filter = "ALL";
+    let hideEarnings = false;
     let live = false;
     let sortKey = "market_cap";
     let sortDir = -1;
@@ -1394,7 +1420,7 @@
           const lv = levels(d);
           const hv = horizon(d);
           return `<tr data-ticker="${d.ticker}" class="${selected === d.ticker ? "picked" : ""}">
-            <td><strong>${d.ticker}</strong><div class="${a.cls} call-sub">(${a.tag})</div>${isLong(d) ? `<div class="call-long call-sub">LONG · ${hv.hold}</div>` : (hv.hold !== "none" ? `<div class="call-sub">${hv.hold}</div>` : "")}</td>
+            <td><strong>${d.ticker}</strong><div class="${a.cls} call-sub">(${a.tag})</div>${isLong(d) ? `<div class="call-long call-sub">LONG · ${hv.hold}</div>` : (hv.hold !== "none" ? `<div class="call-sub">${hv.hold}</div>` : "")}${earnTag(d)}</td>
             <td>${d.name || ""}</td>
             <td class="num">${fmtCap(d.market_cap)}</td>
             <td class="num">$${d.price.toFixed(2)}</td>
@@ -1433,8 +1459,10 @@
         `<span><span class="k">Market:</span> <span style="color:${moodClr}">${b.above_200}% of names above their 200</span> · ${b.above_50}% above the 50</span>`;
       const packTxt = b.buy_pack == null ? "" :
         `<span><span class="k">BUY THIS ${b.buy_pack}</span> · BREAK WATCH ${b.watch_pack}</span>`;
-      bar.innerHTML = `${pill}<span><span class="k">Bar:</span> ${dateTxt}</span>${warn}${breadthTxt}${packTxt}
-        <span>Prices are raw closes — the 50/200 match your IBKR chart.</span>`;
+      const earnTxt = b.earnings_soon ? `<span><span class="k">Earnings soon:</span> ${b.earnings_soon} names</span>` : "";
+      bar.innerHTML = `${pill}<span><span class="k">Bar:</span> ${dateTxt}</span>${warn}${breadthTxt}${packTxt}${earnTxt}
+        <span>Prices are raw closes — the 50/200 match your IBKR chart.</span>
+        <span class="k">Engine ${data.engine || "v1"}</span>`;
     }
 
     function render() {
@@ -1498,6 +1526,8 @@
       const obvLeaveN = all.filter(h => obvRank(h) === "leave").length;
       const packN = all.filter(h => isBuyPack(h)).length;
       const watchN = all.filter(h => isWatchPack(h)).length;
+      const earnN = all.filter(h => earnSoon(h)).length;
+      const earnDays = data.earnings_warn_days || 7;
       chips.innerHTML = `<div class="chip-stack">
         <div class="chip-group calls"><span class="chip-kicker">Calls</span>${callBtns}</div>
         <div class="chip-group obv-row"><span class="chip-kicker">OBV</span>
@@ -1514,10 +1544,15 @@
           <button class="tab ${filter === "TEST_LEAVE" ? "on" : ""}" data-s="TEST_LEAVE">Leave test (${leaveTestN})</button>
           <button class="tab ${filter === "NEAR_ENTRY" ? "on" : ""}" data-s="NEAR_ENTRY">Near last 50-dip (${nearN})</button>
           <button class="tab ${filter === "CALL_LONG" ? "on" : ""}" data-s="CALL_LONG">LONG (${longN})</button>
+          <button class="tab earn-off ${hideEarnings ? "on" : ""}" data-earn="1">Hide earnings ≤${earnDays}d (${earnN})</button>
         </div>
       </div>`;
-      chips.querySelectorAll(".tab").forEach(b => b.onclick = () => {
+      chips.querySelectorAll(".tab[data-s]").forEach(b => b.onclick = () => {
         filter = b.dataset.s;
+        render();
+      });
+      chips.querySelectorAll(".tab[data-earn]").forEach(b => b.onclick = () => {
+        hideEarnings = !hideEarnings;
         render();
       });
       paintFlowCounts(countCall);
@@ -1560,6 +1595,7 @@
       } else {
         rows = all.filter(h => h.signal === filter);
       }
+      if (hideEarnings) rows = rows.filter(h => !earnSoon(h));
 
       renderThoughts(all);
       renderMethod(data);

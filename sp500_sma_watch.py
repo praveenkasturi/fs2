@@ -44,6 +44,8 @@ STAGE_ZONE = 0.08      # how far under a line still counts as the TEST stage
 HOLD_ZONE = 0.025      # how far above its line a name can sit and still be "holding" it
 CONFIRM_CLOSES = 2     # daily closes needed before a break counts
 RSI_BUY = (35, 68)     # RSI band allowed in the BUY THIS pack
+EARNINGS_WARN = 7      # flag a name reporting within this many days
+ENGINE = "v2"          # bumped when the scoring changes, shown on the page
 
 # Add extra names here (Yahoo format: BRK-B not BRK.B).
 # Duplicates of S&P 500 names are skipped automatically.
@@ -1178,6 +1180,59 @@ def fetch_market_caps(tickers: list[str]) -> dict[str, float]:
     return fresh
 
 
+def fetch_earnings(tickers: list[str]) -> dict[str, str]:
+    """Next earnings date per name. Yahoo's calendar is approximate — confirm before acting.
+
+    Only called for names that are actually actionable, so a scan does not slow to a crawl.
+    """
+    out: dict[str, str] = {}
+
+    def one(ticker: str):
+        try:
+            cal = yf.Ticker(ticker).calendar
+            raw = cal.get("Earnings Date") if hasattr(cal, "get") else None
+            if not raw:
+                return ticker, None
+            first = raw[0] if isinstance(raw, (list, tuple)) else raw
+            return ticker, first.isoformat() if hasattr(first, "isoformat") else str(first)
+        except Exception:
+            return ticker, None
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for fut in as_completed([pool.submit(one, t) for t in tickers]):
+            ticker, when = fut.result()
+            if when:
+                out[ticker] = when
+    print(f"earnings dates: {len(out)}/{len(tickers)}")
+    return out
+
+
+def add_earnings(all_rows: list[dict]) -> int:
+    """Tag each actionable name with its next report date. A warning, never a filter."""
+    actionable = {"GAME ON", "RIZZ", "GROWTH", "TEST"}
+    need = [r["ticker"] for r in all_rows if r.get("stage") in actionable or r.get("pack")]
+    dates = fetch_earnings(need) if need else {}
+    today = datetime.now().date()
+    soon = 0
+    for row in all_rows:
+        iso = dates.get(row["ticker"])
+        row["earnings_date"] = iso
+        row["earnings_in"] = None
+        row["earnings_soon"] = False
+        if not iso:
+            continue
+        try:
+            when = datetime.fromisoformat(iso).date()
+        except ValueError:
+            continue
+        days = (when - today).days
+        row["earnings_in"] = days
+        row["earnings_soon"] = 0 <= days <= EARNINGS_WARN
+        if row["earnings_soon"]:
+            soon += 1
+    return soon
+
+
 def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
     names, added, skipped = merge_universe(extra_from_ui)
     tickers = names["ticker"].tolist()
@@ -1221,6 +1276,8 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
     hits.sort(key=lambda h: (order[h["signal"]], abs(h["gap_pct"])))
     all_rows.sort(key=lambda r: r["ticker"])
 
+    reporting_soon = add_earnings(all_rows)
+
     total = max(len(all_rows), 1)
     breadth = {
         "above_200": round(100.0 * sum(1 for r in all_rows if r["price"] > r["sma200"]) / total),
@@ -1228,6 +1285,7 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
         "bull": round(100.0 * sum(1 for r in all_rows if r["regime"] == "bull") / total),
         "buy_pack": sum(1 for r in all_rows if r.get("pack") == "BUY"),
         "watch_pack": sum(1 for r in all_rows if r.get("pack") == "WATCH"),
+        "earnings_soon": reporting_soon,
     }
     breadth["mood"] = (
         "strong" if breadth["above_200"] >= 60
@@ -1238,6 +1296,8 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
 
     payload = {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "engine": ENGINE,
+        "earnings_warn_days": EARNINGS_WARN,
         "universe": len(tickers),
         "close_pct": close_pct,
         "price_basis": "raw daily closes (split-adjusted, not dividend-adjusted) — matches IBKR",
