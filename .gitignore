@@ -1,0 +1,11 @@
+# Scan output — regenerated on every run, not source
+scan_data.js
+scan_data.js.tmp
+sp500_sma_watch_data.json
+
+# Editor / tooling
+.cursor/
+__pycache__/
+*.pyc
+.venv/
+venv/

@@ -1,0 +1,5 @@
+# pandas 3 drops read_html on a raw HTML string, which the S&P 500 list scrape uses.
+pandas>=2.1,<3
+yfinance>=0.2.40
+requests>=2.31
+lxml>=5.0

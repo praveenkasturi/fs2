@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import socket
 import sys
 import threading
@@ -26,6 +25,7 @@ warnings.filterwarnings("ignore")
 HERE = Path(__file__).resolve().parent
 HTML_PATH = HERE / "sp500_sma_watch.html"
 DATA_PATH = HERE / "sp500_sma_watch_data.json"
+SCRIPT_PATH = HERE / "scan_data.js"
 
 CLOSE_PCT = 2.0
 RECENT_DAYS = 10
@@ -36,6 +36,14 @@ STOP_UNDER_50 = 0.02
 ZONE_PCT = 0.02
 MAX_HOLD = 60
 NEAR_ENTRY_PCT = 0.025
+
+OBV_LOOK = 10          # days of money flow to read
+OBV_IN = 0.10          # net flow >= 10% of traded volume counts as money coming in
+TEST_ZONE = 0.05       # how far under a line still counts as a live test
+STAGE_ZONE = 0.08      # how far under a line still counts as the TEST stage
+HOLD_ZONE = 0.025      # how far above its line a name can sit and still be "holding" it
+CONFIRM_CLOSES = 2     # daily closes needed before a break counts
+RSI_BUY = (35, 68)     # RSI band allowed in the BUY THIS pack
 
 # Add extra names here (Yahoo format: BRK-B not BRK.B).
 # Duplicates of S&P 500 names are skipped automatically.
@@ -144,11 +152,16 @@ def _panel(data: pd.DataFrame, field: str) -> pd.DataFrame | None:
 
 
 def download_market(tickers: list[str]) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+    """Raw closes (split-adjusted, dividend-unadjusted) so the 50/200 match a broker chart.
+
+    auto_adjust=True back-adjusts history for dividends, which shifts the 200 by ~0.7% on
+    payers like LMT and can invent a golden cross that does not exist in IBKR.
+    """
     data = yf.download(
         tickers,
         period="2y",
         interval="1d",
-        auto_adjust=True,
+        auto_adjust=False,
         threads=True,
         progress=True,
     )
@@ -158,6 +171,36 @@ def download_market(tickers: list[str]) -> tuple[pd.DataFrame, pd.DataFrame | No
         closes.columns = [normalize_ticker(c) for c in closes.columns]
         closes = closes.dropna(axis=1, how="all")
     return closes, _panel(data, "Volume")
+
+
+def download_benchmark() -> pd.Series | None:
+    """S&P 500 index closes, for relative strength."""
+    try:
+        data = yf.download("^GSPC", period="2y", interval="1d", auto_adjust=False, progress=False)
+        panel = _panel(data, "Close")
+        if panel is None or panel.empty:
+            return None
+        return panel.iloc[:, 0].dropna()
+    except Exception:
+        return None
+
+
+def market_state(last_bar) -> dict:
+    """Is the last daily bar final, or is the session still running?"""
+    bar = pd.Timestamp(last_bar)
+    out = {"bar_date": bar.strftime("%Y-%m-%d"), "provisional": False, "market": "unknown"}
+    try:
+        now = pd.Timestamp.now(tz="America/New_York")
+    except Exception:
+        return out
+    weekday = now.weekday() < 5
+    open_at = now.replace(hour=9, minute=30, second=0, microsecond=0)
+    close_at = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    is_open = weekday and open_at <= now <= close_at
+    out["market"] = "open" if is_open else "closed"
+    out["provisional"] = bool(is_open and bar.date() == now.date())
+    out["checked_at"] = now.strftime("%Y-%m-%d %H:%M %Z")
+    return out
 
 
 def rsi_series(close: pd.Series, n: int = 14) -> pd.Series:
@@ -184,46 +227,75 @@ def obv_series(close: pd.Series, volume: pd.Series) -> pd.Series:
     return signed.cumsum()
 
 
-def obv_tape(close: pd.Series, volume: pd.Series | None) -> dict:
-    """Price vs OBV over ~10 days: best / ok / leave. Check only — not a buy trigger."""
+def obv_tape(close: pd.Series, volume: pd.Series | None, look: int = OBV_LOOK) -> dict:
+    """Net money flow over ~10 days as a share of the volume actually traded.
+
+    OBV is a running total whose level depends on where the download starts, so a percent
+    change of OBV is meaningless. Dividing by (average daily volume x days) gives a number
+    between about -1 and +1: "net buying was 24% of everything traded".
+    """
     n = len(close)
-    price_dir = "up" if n >= 10 and float(close.iloc[-1]) > float(close.iloc[-10]) else "down"
-    out = {"price_dir": price_dir, "obv_dir": None, "obv_rank": "ok"}
-    if volume is None or n < 15:
+    price_dir = "up" if n > look and float(close.iloc[-1]) > float(close.iloc[-1 - look]) else "down"
+    out = {
+        "price_dir": price_dir,
+        "obv_dir": None,
+        "obv_flow": None,
+        "obv_rank": "unknown",
+        "obv_why": "No volume data — treated as unknown, not good.",
+    }
+    if volume is None or n < look + 20:
         return out
-    v = volume.reindex(close.index).fillna(0)
-    if float(v.tail(15).sum()) <= 0:
+    v = volume.reindex(close.index).fillna(0).astype(float)
+    avg = float(v.iloc[-20:].mean())
+    if avg <= 0:
         return out
     obv = obv_series(close, v)
-    look = 10 if n >= 20 else max(n // 2, 3)
-    o_now = float(obv.iloc[-1])
-    o_ago = float(obv.iloc[-look])
-    span = max(abs(o_ago), abs(o_now), 1.0)
-    chg = (o_now - o_ago) / span
-    if chg > 0.01:
-        obv_dir = "up"
-    elif chg < -0.01:
-        obv_dir = "down"
+    flow = (float(obv.iloc[-1]) - float(obv.iloc[-1 - look])) / (avg * look)
+    pct = flow * 100
+    if flow >= OBV_IN:
+        obv_dir, rank = "up", "best"
+        why = f"money coming in — net buying is {pct:.0f}% of the last {look} days of volume"
+    elif flow <= -OBV_IN:
+        obv_dir, rank = "down", "leave"
+        why = f"money leaving — net selling is {abs(pct):.0f}% of the last {look} days of volume"
     else:
-        obv_dir = "flat"
-    if obv_dir == "up":
-        rank = "best"
-    elif obv_dir == "flat":
-        rank = "ok"
-    else:
-        rank = "leave"
-    return {"price_dir": price_dir, "obv_dir": obv_dir, "obv_rank": rank}
+        obv_dir, rank = "flat", "ok"
+        why = f"money held — net flow is only {pct:+.0f}% of recent volume"
+    return {
+        "price_dir": price_dir,
+        "obv_dir": obv_dir,
+        "obv_flow": round(flow, 3),
+        "obv_rank": rank,
+        "obv_why": why,
+    }
 
 
-def dip_quality(close: pd.Series, sma50: pd.Series, volume: pd.Series | None) -> dict:
-    """Buy the dip to the 50 vs leave it — volume, RSI, OBV, 50 slope."""
+def dip_quality(
+    close: pd.Series,
+    line: pd.Series | None,
+    line_name: str,
+    volume: pd.Series | None,
+) -> dict:
+    """Buy the dip vs leave it, scored against the line the name is actually holding.
+
+    A GAME ON sitting on the 200 is judged on the 200, not on a 50 far overhead.
+    """
+    if line is None or pd.isna(line.iloc[-1]):
+        return {
+            "dip_verdict": "leave",
+            "dip_label": "LEAVE THE DIP",
+            "dip_score": -3,
+            "dip_why": "No line under price to dip into.",
+            "dip_line": None,
+        }
     px = float(close.iloc[-1])
-    s50 = float(sma50.iloc[-1])
+    s50 = float(line.iloc[-1])
     n = len(close)
     above_50 = px >= s50 * 0.995
     lost_50 = px < s50 * 0.98
     look = min(SLOPE_LOOKBACK, n - 1)
-    rising = bool(s50 > float(sma50.iloc[-1 - look]))
+    rising = bool(s50 > float(line.iloc[-1 - look]))
+    sma50 = line
 
     vol_ratio = None
     vol_shrink = False
@@ -270,12 +342,12 @@ def dip_quality(close: pd.Series, sma50: pd.Series, volume: pd.Series | None) ->
     reasons: list[str] = []
     if lost_50:
         score -= 2
-        reasons.append("close lost the 50 — 200 is in play")
+        reasons.append(f"close lost the {line_name}")
     elif above_50:
         score += 2
-        reasons.append("close still holds the 50")
+        reasons.append(f"close still holds the {line_name}")
     else:
-        reasons.append("sitting right on the 50")
+        reasons.append(f"sitting right on the {line_name}")
 
     if vol_shrink:
         score += 1
@@ -303,16 +375,16 @@ def dip_quality(close: pd.Series, sma50: pd.Series, volume: pd.Series | None) ->
 
     if rising:
         score += 1
-        reasons.append("50 is still rising")
+        reasons.append(f"{line_name} is still rising")
     else:
         score -= 1
-        reasons.append("50 is flat or falling")
+        reasons.append(f"{line_name} is flat or falling")
 
     if first_touch:
         score += 1
-        reasons.append("early visit to the 50")
+        reasons.append(f"early visit to the {line_name}")
     else:
-        reasons.append("50 already tagged a few times")
+        reasons.append(f"{line_name} already tagged a few times")
 
     if lost_50 or score <= 0:
         verdict, label = "leave", "LEAVE THE DIP"
@@ -326,12 +398,13 @@ def dip_quality(close: pd.Series, sma50: pd.Series, volume: pd.Series | None) ->
         "dip_label": label,
         "dip_score": score,
         "dip_why": "; ".join(reasons[:6]),
-        "vol_ratio": vol_ratio,
-        "vol_shrink": vol_shrink,
-        "obv_holds": obv_holds,
-        "obv_new_low": obv_new_low,
-        "rsi_div": rsi_div,
-        "first_touch": first_touch,
+        "dip_line": line_name,
+        "dip_vol_ratio": vol_ratio,
+        "dip_vol_shrink": vol_shrink,
+        "dip_obv_holds": obv_holds,
+        "dip_obv_new_low": obv_new_low,
+        "dip_rsi_div": rsi_div,
+        "dip_first_touch": first_touch,
     }
 
 
@@ -404,17 +477,19 @@ def test_quality(close: pd.Series, sma50: pd.Series, sma200: pd.Series, volume: 
     coming_back = approaches >= 2
     rising_px = n >= 10 and float(close.iloc[-1]) > float(close.iloc[-10])
     extras = {
-        "vol_shrink": vol_shrink,
-        "vol_ratio": None if vol_ratio is None else round(float(vol_ratio), 2),
-        "vol_hot": vol_hot,
-        "obv_holds": obv_holds,
-        "obv_new_low": obv_new_low,
+        "test_vol_shrink": vol_shrink,
+        "test_vol_ratio": None if vol_ratio is None else round(float(vol_ratio), 2),
+        "test_vol_hot": vol_hot,
+        "test_obv_holds": obv_holds,
+        "test_obv_new_low": obv_new_low,
+        "test_gap_pct": round(gap * 100, 2),
+        "test_line": line,
     }
 
     fails: list[str] = []
     if death:
         fails.append("death / near-death")
-    if gap > 0.04:
+    if gap > TEST_ZONE:
         fails.append(f"still {gap * 100:.1f}% under the {line} — not in the test zone yet")
     if not coming_back:
         fails.append("first slam at the line — usually fails")
@@ -450,6 +525,215 @@ def test_quality(close: pd.Series, sma50: pd.Series, sma200: pd.Series, volume: 
         "coming_back": True,
         "test_approaches": approaches,
         **extras,
+    }
+
+
+def bands_of(px: float, s50: float, s200: float) -> tuple[tuple[str, float] | None, tuple[str, float] | None]:
+    """Nearest line overhead (ceiling) and nearest line underneath (support)."""
+    lines = [("50", s50), ("200", s200)]
+    over = sorted([l for l in lines if px < l[1]], key=lambda l: l[1])
+    under = sorted([l for l in lines if px >= l[1]], key=lambda l: -l[1])
+    return (over[0] if over else None), (under[0] if under else None)
+
+
+def line_run(close: pd.Series, line: pd.Series) -> int:
+    """Consecutive daily closes above the line (+) or below it (-)."""
+    above = (close > line) & line.notna()
+    last = bool(above.iloc[-1])
+    run = 0
+    for flag in reversed(above.tolist()):
+        if bool(flag) != last:
+            break
+        run += 1
+    return run if last else -run
+
+
+def was_below(close: pd.Series, line: pd.Series, look: int = 40) -> bool:
+    """Did price trade under this line recently? Compares each day to the line on that day."""
+    c, s = close.iloc[-look:-1], line.iloc[-look:-1]
+    if c.empty:
+        return False
+    return bool((c < s).any())
+
+
+def compression(close: pd.Series, line: pd.Series, look: int = 20) -> dict:
+    """Pre-break coil: gap to the line closing, lows lifting, daily range tightening.
+
+    This is the Friday-Tesla tell — a walk-up that is winding tighter into the ceiling.
+    """
+    n = len(close)
+    out = {"coil_score": 0, "coil_why": "", "coil_gap_now": None, "coil_gap_then": None}
+    if n < look * 2 or pd.isna(line.iloc[-1]):
+        return out
+    px, lv = float(close.iloc[-1]), float(line.iloc[-1])
+    then_px, then_lv = float(close.iloc[-1 - look]), float(line.iloc[-1 - look])
+    if lv <= 0 or then_lv <= 0:
+        return out
+    gap_now = (lv - px) / lv
+    gap_then = (then_lv - then_px) / then_lv
+    lows_now = float(close.iloc[-look // 2:].min())
+    lows_then = float(close.iloc[-look:-look // 2].min())
+    rng_now = float(close.iloc[-look // 2:].max()) - lows_now
+    rng_then = float(close.iloc[-look:-look // 2].max()) - lows_then
+    score = 0
+    why = []
+    if gap_now < gap_then:
+        score += 1
+        why.append("gap to the line is closing")
+    if lows_now > lows_then:
+        score += 1
+        why.append("lows are lifting")
+    if rng_then > 0 and rng_now < rng_then:
+        score += 1
+        why.append("daily range is tightening")
+    out.update({
+        "coil_score": score,
+        "coil_why": "; ".join(why) if why else "no coil — drifting, not winding up",
+        "coil_gap_now": round(gap_now * 100, 2),
+        "coil_gap_then": round(gap_then * 100, 2),
+    })
+    return out
+
+
+def rel_strength(close: pd.Series, bench: pd.Series | None, look: int = 60) -> float | None:
+    """Return over ~3 months minus the S&P's, in points."""
+    if bench is None or len(close) <= look:
+        return None
+    b = bench.reindex(close.index).ffill().dropna()
+    if len(b) <= look:
+        return None
+    mine = float(close.iloc[-1]) / float(close.iloc[-1 - look]) - 1
+    theirs = float(b.iloc[-1]) / float(b.iloc[-1 - look]) - 1
+    return round((mine - theirs) * 100, 1)
+
+
+def stage_of(row: dict, close: pd.Series, sma50: pd.Series, sma200: pd.Series) -> dict:
+    """The one place a name gets its stair label. The page only renders this."""
+    px, s50, s200 = row["price"], row["sma50"], row["sma200"]
+    rsi, reg, signal = row["rsi"], row["regime"], row["signal"]
+    resist, support = bands_of(px, s50, s200)
+    bouncing = len(close) >= 6 and float(close.iloc[-1]) >= float(close.iloc[-6])
+    death = signal in ("NEAR_DEATH", "DEATH_TODAY")
+
+    def out(tag: str, why: str) -> dict:
+        return {"stage": tag, "stage_why": why}
+
+    if death:
+        return out("AVOID", "The 50 is losing the 200. Rallies off this usually fail.")
+    if (
+        reg == "bull" and row["sma50_rising"] and px <= s50 * 1.02
+        and rsi is not None and 35 <= rsi < 60 and bouncing
+    ):
+        return out("GROWTH", "Uptrend, dip to a rising 50, RSI cooled, last days already turning up. The cleanest last-stair dip.")
+    if reg == "bull":
+        if px <= s50 * 1.02 and (rsi is None or rsi < 60):
+            return out("RIZZ", "Uptrend and price is back on the 50. Last stair — the 50 is support.")
+        return out("HOLD", "Uptrend already running. Only interesting on a dip to the 50 — not up here.")
+    if signal in ("GOLDEN_TODAY", "RECENT_GOLDEN"):
+        return out("HOLD", "The cross happened. Don't chase the first green day. Wait for a pullback to the 50.")
+    if (
+        support and not death
+        and 0 <= (px - support[1]) / support[1] <= HOLD_ZONE
+        and was_below(close, sma50 if support[0] == "50" else sma200)
+        and (rsi is None or rsi < 68)
+    ):
+        nxt = resist[0] if resist else "open air"
+        return out("GAME ON", f"Broke the {support[0]}, came back, and is holding it. That line is support now. Next ceiling is the {nxt}.")
+    if resist and not death:
+        gap = (resist[1] - px) / resist[1]
+        rsi_ok = rsi is None or 38 <= rsi < 62
+        rising = len(close) >= 10 and float(close.iloc[-1]) > float(close.iloc[-10])
+        if 0 <= gap <= STAGE_ZONE and rising and rsi_ok:
+            return out("TEST", f"Climbing into the {resist[0]} from below. That line is still the ceiling. Early tests usually fail — wait for a close through.")
+    if reg == "mixed":
+        return out("RANGE", "Price is between the two averages. One is support, one is the ceiling. Sit it out.")
+    if reg == "repairing":
+        return out("CLEAR", "Above both lines, but the 50 has not crossed the 200 yet. Don't chase — wait for a retest.")
+    if reg == "bear":
+        return out("AVOID", "Below both averages and not in a clean test of the near line.")
+    return out("RANGE", "Stuck between the two averages.")
+
+
+def pack_of(row: dict) -> dict:
+    """BUY THIS = every check green after the break. BREAK WATCH = the walk-up before it."""
+    stage = row["stage"]
+    px = row["price"]
+    rsi = row["rsi"]
+    lo, hi = RSI_BUY
+
+    if stage in ("TEST", "AVOID"):
+        if row.get("test_verdict") == "good":
+            return {
+                "pack": "WATCH",
+                "pack_why": "Walk-up into the line. Not a buy yet — the entry is a daily close through it.",
+                "pack_checks": [],
+            }
+        return {"pack": None, "pack_why": "", "pack_checks": []}
+
+    if stage not in ("GAME ON", "RIZZ", "GROWTH"):
+        return {"pack": None, "pack_why": "", "pack_checks": []}
+
+    line_px = row.get("line_px")
+    over = None if not line_px else (px - line_px) / line_px * 100
+    run = row.get("line_run") or 0
+    checks = [
+        {
+            "label": "Stage is a buy stage",
+            "ok": True,
+            "note": f"{stage} — price already owns a line",
+        },
+        {
+            "label": "Holding its line",
+            "ok": bool(line_px and px >= line_px * 0.995),
+            "note": "no line underneath" if not line_px else f"{over:+.1f}% vs the {row.get('line_name')} at ${line_px:,.2f}",
+        },
+        {
+            "label": "Break is confirmed",
+            "ok": run >= CONFIRM_CLOSES,
+            "note": f"{abs(run)} closes {'above' if run > 0 else 'below'} the line (need {CONFIRM_CLOSES} above)",
+        },
+        {
+            "label": "Not stretched",
+            "ok": over is not None and over <= HOLD_ZONE * 100 * 2,
+            "note": "no line underneath" if over is None else f"{over:+.1f}% above the line (want under {HOLD_ZONE * 200:.0f}%)",
+        },
+        {
+            "label": "Dip flag says buy",
+            "ok": row.get("dip_verdict") == "buy",
+            "note": row.get("dip_label") or "no dip read",
+        },
+        {
+            "label": "Money not leaving",
+            "ok": row.get("obv_rank") in ("best", "ok"),
+            "note": row.get("obv_why") or "",
+        },
+        {
+            "label": "RSI sane",
+            "ok": rsi is not None and lo <= rsi <= hi,
+            "note": "no RSI" if rsi is None else f"RSI {rsi:.0f} (want {lo}–{hi})",
+        },
+        {
+            "label": "No death cross nearby",
+            "ok": row["signal"] not in ("NEAR_DEATH", "DEATH_TODAY"),
+            "note": "50 is not losing the 200",
+        },
+    ]
+    misses = [c["label"] for c in checks if not c["ok"]]
+    if misses:
+        return {
+            "pack": None,
+            "pack_why": "Missing: " + ", ".join(misses).lower() + ".",
+            "pack_checks": checks,
+        }
+    strong = row.get("obv_rank") == "best"
+    return {
+        "pack": "BUY",
+        "pack_why": (
+            "Every check is green: it owns its line, the break is confirmed, the dip reads clean, "
+            + ("money is coming in" if strong else "money is holding")
+            + ", RSI is sane. Confirm the last bar on IBKR before you act."
+        ),
+        "pack_checks": checks,
     }
 
 
@@ -497,11 +781,12 @@ def _forward_from(close: pd.Series, sma50: pd.Series, idxs: list[int]) -> list[d
             px = float(close.iloc[j])
             s50 = sma50.iloc[j]
             days = j - i
-            if px >= entry * (1 + TARGET_PCT):
-                resolved = {"result": "win", "days": days, "pct": round((px / entry - 1) * 100, 2)}
-                break
+            # Stop first: if one bar could have hit both, score the bad outcome.
             if pd.notna(s50) and px <= float(s50) * (1 - STOP_UNDER_50):
                 resolved = {"result": "loss", "days": days, "pct": round((px / entry - 1) * 100, 2)}
+                break
+            if px >= entry * (1 + TARGET_PCT):
+                resolved = {"result": "win", "days": days, "pct": round((px / entry - 1) * 100, 2)}
                 break
         if resolved is None:
             px = float(close.iloc[hold_end])
@@ -520,7 +805,7 @@ def poke_stats(close: pd.Series) -> dict:
     close = close.dropna()
     sma50 = close.rolling(50).mean()
     sma200 = close.rolling(200).mean()
-    approaches = failed = broke = 0
+    approaches = failed = broke = unresolved = 0
     n = len(close)
     for sma in (sma50, sma200):
         in_zone = sma.notna() & (close < sma) & (close >= sma * (1 - ZONE_PCT))
@@ -545,8 +830,9 @@ def poke_stats(close: pd.Series) -> dict:
                     resolved = True
                     break
             if not resolved:
-                failed += 1
-    return {"approaches": approaches, "failed": failed, "broke": broke}
+                # Still in progress at the end of the data. Not a failure — just unknown.
+                unresolved += 1
+    return {"approaches": approaches, "failed": failed, "broke": broke, "unresolved": unresolved}
 
 
 def held_events(close: pd.Series) -> list[dict]:
@@ -584,14 +870,15 @@ def held_events(close: pd.Series) -> list[dict]:
                 px = float(close.iloc[k])
                 s = sma.iloc[k]
                 days = k - entry_j
+                # Stop first: if one bar could have hit both, score the bad outcome.
+                if pd.notna(s) and px <= float(s) * (1 - STOP_UNDER_50):
+                    resolved = {"result": "loss", "days": days, "pct": round((px / entry - 1) * 100, 2)}
+                    break
                 if target is not None and px >= target:
                     resolved = {"result": "win", "days": days, "pct": round((px / entry - 1) * 100, 2)}
                     break
                 if target is None and px >= entry * (1 + TARGET_PCT):
                     resolved = {"result": "win", "days": days, "pct": round((px / entry - 1) * 100, 2)}
-                    break
-                if pd.notna(s) and px <= float(s) * (1 - STOP_UNDER_50):
-                    resolved = {"result": "loss", "days": days, "pct": round((px / entry - 1) * 100, 2)}
                     break
             if resolved is None:
                 px = float(close.iloc[hold_end])
@@ -689,7 +976,12 @@ def catchup_clock(sma50: pd.Series, s50: float, s200: float) -> dict:
     return {"sma50_slope": round(slope, 4), "months_to_cross": months}
 
 
-def classify(close: pd.Series, close_pct: float, volume: pd.Series | None = None) -> dict | None:
+def classify(
+    close: pd.Series,
+    close_pct: float,
+    volume: pd.Series | None = None,
+    bench: pd.Series | None = None,
+) -> dict | None:
     close = close.dropna()
     if len(close) < 200:
         return None
@@ -736,6 +1028,7 @@ def classify(close: pd.Series, close_pct: float, volume: pd.Series | None = None
         "rsi": None if (r := rsi_wilder(close)) is None else round(r, 1),
         "regime": reg,
         "market_cap": None,
+        "bar_date": close.index[-1].strftime("%Y-%m-%d"),
         "spark": [round(float(v), 2) for v in close.tail(40).tolist()],
     }
     row.update(catchup_clock(sma50, float(s50), float(s200)))
@@ -751,9 +1044,44 @@ def classify(close: pd.Series, close_pct: float, volume: pd.Series | None = None
         row["pct_since_entry"] = None
         row["near_entry"] = False
         row["entry_result"] = None
-    row.update(dip_quality(close, sma50, volume))
-    row.update(test_quality(close, sma50, sma200, volume, signal))
+    series = {"50": sma50, "200": sma200}
+    resist, support = bands_of(float(px), float(s50), float(s200))
+
+    row.update(stage_of(row, close, sma50, sma200))
     row.update(obv_tape(close, volume))
+    row["rs_60"] = rel_strength(close, bench)
+
+    # The line the plan hangs on: what price is standing on, else the ceiling above it.
+    plan = support or resist
+    row["line_name"] = None if not plan else plan[0]
+    row["line_px"] = None if not plan else round(plan[1], 2)
+    row["line_kind"] = "support" if support else ("ceiling" if resist else None)
+    row["ceiling_name"] = None if not resist else resist[0]
+    row["ceiling_px"] = None if not resist else round(resist[1], 2)
+    row["line_run"] = 0 if not support else line_run(close, series[support[0]])
+    row["confirmed_break"] = bool(support and row["line_run"] >= CONFIRM_CLOSES)
+
+    coil_line = series[resist[0]] if resist else series[support[0]] if support else None
+    if coil_line is not None:
+        row.update(compression(close, coil_line))
+
+    row.update(dip_quality(close, series[support[0]] if support else None, support[0] if support else "line", volume))
+    row.update(test_quality(close, sma50, sma200, volume, signal))
+    row.update(pack_of(row))
+
+    if row["stage"] in ("TEST", "AVOID"):
+        row["flag_verdict"] = row.get("test_verdict")
+        row["flag_label"] = row.get("test_label")
+        row["flag_why"] = row.get("test_why")
+    elif row["stage"] in ("GAME ON", "RIZZ", "GROWTH"):
+        row["flag_verdict"] = row.get("dip_verdict")
+        row["flag_label"] = row.get("dip_label")
+        row["flag_why"] = row.get("dip_why")
+    else:
+        row["flag_verdict"] = None
+        row["flag_label"] = None
+        row["flag_why"] = None
+
     row["_tests"] = tests
     row["_held"] = held_events(close)
     row["_pokes"] = poke_stats(close)
@@ -771,19 +1099,15 @@ def load_last() -> dict | None:
 
 
 def inject(payload: dict) -> None:
-    html = HTML_PATH.read_text(encoding="utf-8")
+    """Write the scan next to the page instead of rewriting the page itself.
+
+    The HTML used to carry ~800 KB of embedded data, so every scan dirtied a tracked
+    source file. Now the page loads scan_data.js and the HTML never changes.
+    """
     blob = json.dumps(payload, separators=(",", ":"))
-    repl = f"<!--SCAN_DATA-->\n  <script>window.SCAN_DATA = {blob};</script>\n  <!--/SCAN_DATA-->"
-    updated, n = re.subn(
-        r"<!--SCAN_DATA-->.*?<!--/SCAN_DATA-->",
-        lambda _: repl,
-        html,
-        count=1,
-        flags=re.S,
-    )
-    if n != 1:
-        raise RuntimeError("Could not find SCAN_DATA markers in the HTML file.")
-    HTML_PATH.write_text(updated, encoding="utf-8")
+    tmp = SCRIPT_PATH.with_suffix(".js.tmp")
+    tmp.write_text(f"window.SCAN_DATA = {blob};\n", encoding="utf-8")
+    tmp.replace(SCRIPT_PATH)
 
 
 def save_last(payload: dict) -> None:
@@ -859,18 +1183,21 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
     tickers = names["ticker"].tolist()
     print(f"{datetime.now():%Y-%m-%d %H:%M:%S}  {len(tickers)} names  added={added}  skipped_dupes={skipped}")
     closes, volumes = download_market(tickers)
+    bench = download_benchmark()
     info = names.set_index("ticker")
+    skipped_short: list[str] = []
 
     all_rows = []
     all_tests: list[dict] = []
     all_held: list[dict] = []
-    poke_tot = {"approaches": 0, "failed": 0, "broke": 0}
+    poke_tot = {"approaches": 0, "failed": 0, "broke": 0, "unresolved": 0}
     for ticker in closes.columns:
         vol = None
         if volumes is not None and ticker in volumes.columns:
             vol = volumes[ticker]
-        result = classify(closes[ticker], close_pct, vol)
+        result = classify(closes[ticker], close_pct, vol, bench)
         if not result:
+            skipped_short.append(ticker)
             continue
         meta = info.loc[ticker] if ticker in info.index else None
         result["ticker"] = ticker
@@ -893,14 +1220,34 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
     order = {"GOLDEN_TODAY": 0, "NEAR_GOLDEN": 1, "RECENT_GOLDEN": 2, "NEAR_DEATH": 3, "DEATH_TODAY": 4}
     hits.sort(key=lambda h: (order[h["signal"]], abs(h["gap_pct"])))
     all_rows.sort(key=lambda r: r["ticker"])
+
+    total = max(len(all_rows), 1)
+    breadth = {
+        "above_200": round(100.0 * sum(1 for r in all_rows if r["price"] > r["sma200"]) / total),
+        "above_50": round(100.0 * sum(1 for r in all_rows if r["price"] > r["sma50"]) / total),
+        "bull": round(100.0 * sum(1 for r in all_rows if r["regime"] == "bull") / total),
+        "buy_pack": sum(1 for r in all_rows if r.get("pack") == "BUY"),
+        "watch_pack": sum(1 for r in all_rows if r.get("pack") == "WATCH"),
+    }
+    breadth["mood"] = (
+        "strong" if breadth["above_200"] >= 60
+        else "mixed" if breadth["above_200"] >= 40
+        else "weak"
+    )
+    last_bar = closes.index[-1] if len(closes.index) else datetime.now()
+
     payload = {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "universe": len(tickers),
         "close_pct": close_pct,
+        "price_basis": "raw daily closes (split-adjusted, not dividend-adjusted) — matches IBKR",
+        "market": market_state(last_bar),
+        "breadth": breadth,
         "hits": hits,
         "all": all_rows,
         "added": added,
         "skipped_duplicates": skipped,
+        "skipped_short_history": skipped_short,
         "extra_tickers": parse_ticker_list(list(EXTRA_TICKERS) + list(extra_from_ui or [])),
         "method_test": {
             "held": summarize_tests(
@@ -915,8 +1262,9 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
             "dip": summarize_tests(all_tests),
             "pokes": {
                 **poke_tot,
-                "fail_rate": None if not poke_tot["approaches"] else round(
-                    100.0 * poke_tot["failed"] / poke_tot["approaches"], 1
+                # Only pokes that actually resolved. Ones still running are not failures.
+                "fail_rate": None if not (poke_tot["failed"] + poke_tot["broke"]) else round(
+                    100.0 * poke_tot["failed"] / (poke_tot["failed"] + poke_tot["broke"]), 1
                 ),
             },
         },
@@ -951,17 +1299,23 @@ def make_handler(close_pct: float):
             self._cors()
             self.end_headers()
 
+        def _file(self, path: Path, mime: str):
+            data = path.read_bytes() if path.exists() else b""
+            self.send_response(200)
+            self.send_header("Content-Type", mime)
+            self.send_header("Cache-Control", "no-store")
+            self._cors()
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
         def do_GET(self):
             path = urlparse(self.path).path
             if path in ("/", "/index.html", "/sp500_sma_watch.html"):
-                data = HTML_PATH.read_bytes()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Cache-Control", "no-store")
-                self._cors()
-                self.send_header("Content-Length", str(len(data)))
-                self.end_headers()
-                self.wfile.write(data)
+                self._file(HTML_PATH, "text/html; charset=utf-8")
+                return
+            if path == "/scan_data.js":
+                self._file(SCRIPT_PATH, "application/javascript; charset=utf-8")
                 return
             if path == "/api/health":
                 self._json(200, {"ok": True, "extra_tickers": parse_ticker_list(EXTRA_TICKERS)})
