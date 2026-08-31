@@ -184,6 +184,37 @@ def obv_series(close: pd.Series, volume: pd.Series) -> pd.Series:
     return signed.cumsum()
 
 
+def obv_tape(close: pd.Series, volume: pd.Series | None) -> dict:
+    """Price vs OBV over ~10 days: best / ok / leave. Check only — not a buy trigger."""
+    n = len(close)
+    price_dir = "up" if n >= 10 and float(close.iloc[-1]) > float(close.iloc[-10]) else "down"
+    out = {"price_dir": price_dir, "obv_dir": None, "obv_rank": "ok"}
+    if volume is None or n < 15:
+        return out
+    v = volume.reindex(close.index).fillna(0)
+    if float(v.tail(15).sum()) <= 0:
+        return out
+    obv = obv_series(close, v)
+    look = 10 if n >= 20 else max(n // 2, 3)
+    o_now = float(obv.iloc[-1])
+    o_ago = float(obv.iloc[-look])
+    span = max(abs(o_ago), abs(o_now), 1.0)
+    chg = (o_now - o_ago) / span
+    if chg > 0.01:
+        obv_dir = "up"
+    elif chg < -0.01:
+        obv_dir = "down"
+    else:
+        obv_dir = "flat"
+    if obv_dir == "up":
+        rank = "best"
+    elif obv_dir == "flat":
+        rank = "ok"
+    else:
+        rank = "leave"
+    return {"price_dir": price_dir, "obv_dir": obv_dir, "obv_rank": rank}
+
+
 def dip_quality(close: pd.Series, sma50: pd.Series, volume: pd.Series | None) -> dict:
     """Buy the dip to the 50 vs leave it — volume, RSI, OBV, 50 slope."""
     px = float(close.iloc[-1])
@@ -722,6 +753,7 @@ def classify(close: pd.Series, close_pct: float, volume: pd.Series | None = None
         row["entry_result"] = None
     row.update(dip_quality(close, sma50, volume))
     row.update(test_quality(close, sma50, sma200, volume, signal))
+    row.update(obv_tape(close, volume))
     row["_tests"] = tests
     row["_held"] = held_events(close)
     row["_pokes"] = poke_stats(close)
