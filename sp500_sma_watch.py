@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import socket
 import sys
 import threading
@@ -26,6 +27,53 @@ HERE = Path(__file__).resolve().parent
 HTML_PATH = HERE / "sp500_sma_watch.html"
 DATA_PATH = HERE / "sp500_sma_watch_data.json"
 SCRIPT_PATH = HERE / "scan_data.js"
+
+
+def fix_stdio() -> None:
+    """Background launches (sp500watch://) often have no console — print/tqdm then crash."""
+    import os
+
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        try:
+            if stream is None:
+                raise OSError("missing stream")
+            stream.write("")
+            stream.flush()
+        except OSError:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8", errors="replace"))
+
+
+def log(msg: str) -> None:
+    try:
+        print(msg, flush=True)
+    except OSError:
+        pass
+
+
+def json_safe(obj):
+    """Turn NaN / Inf into None so browsers can parse the payload."""
+    if isinstance(obj, dict):
+        return {k: json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [json_safe(v) for v in obj]
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    try:
+        # numpy / pandas scalars
+        if hasattr(obj, "item"):
+            return json_safe(obj.item())
+    except Exception:
+        pass
+    if pd.isna(obj):
+        return None
+    return obj
+
+
+def dumps_json(payload, **kwargs) -> str:
+    return json.dumps(json_safe(payload), allow_nan=False, **kwargs)
 
 CLOSE_PCT = 2.0
 RECENT_DAYS = 10
@@ -62,18 +110,26 @@ PROTOCOL = "sp500watch"
 
 
 def install_protocol() -> None:
-    """Let the HTML button start this script via sp500watch:// (current user, no admin)."""
+    """Let the HTML button start this script via sp500watch:// (current user, no admin).
+
+    Browser protocol launches hide the console. Wrap with `start` so a real
+    black window opens and stays open while the watcher runs.
+    """
     import winreg
 
     script = str(HTML_PATH.with_name("sp500_sma_watch.py"))
-    cmd = f'"{sys.executable}" "{script}" --no-open "%1"'
+    work = str(HERE)
+    # /D sets the working folder; title "FinSense Watcher" must come right after start.
+    cmd = (
+        f'cmd.exe /c start "FinSense Watcher" /D "{work}" '
+        f'"{sys.executable}" "{script}" --no-open'
+    )
     base = winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{PROTOCOL}")
     winreg.SetValueEx(base, "", 0, winreg.REG_SZ, "URL:SP500 SMA Watch")
     winreg.SetValueEx(base, "URL Protocol", 0, winreg.REG_SZ, "")
     cmd_key = winreg.CreateKey(base, r"shell\open\command")
     winreg.SetValueEx(cmd_key, "", 0, winreg.REG_SZ, cmd)
-    print("HTML one-click is enabled (sp500watch://)")
-
+    log("HTML one-click is enabled (sp500watch://) — opens a visible Python window")
 
 def port_busy(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -153,26 +209,77 @@ def _panel(data: pd.DataFrame, field: str) -> pd.DataFrame | None:
     return out.dropna(axis=1, how="all")
 
 
-def download_market(tickers: list[str]) -> tuple[pd.DataFrame, pd.DataFrame | None]:
-    """Raw closes (split-adjusted, dividend-unadjusted) so the 50/200 match a broker chart.
-
-    auto_adjust=True back-adjusts history for dividends, which shifts the 200 by ~0.7% on
-    payers like LMT and can invent a golden cross that does not exist in IBKR.
-    """
-    data = yf.download(
-        tickers,
-        period="2y",
-        interval="1d",
-        auto_adjust=False,
-        threads=True,
-        progress=True,
-    )
+def _download_chunk(tickers: list[str]) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
+    """One Yahoo batch. Returns (closes, volumes) or (None, None) on hard failure."""
+    try:
+        data = yf.download(
+            tickers,
+            period="2y",
+            interval="1d",
+            auto_adjust=False,
+            threads=True,
+            progress=False,
+            group_by="column",
+        )
+    except Exception as exc:
+        log(f"download batch failed ({len(tickers)} names): {exc}")
+        return None, None
+    if data is None or getattr(data, "empty", True):
+        return None, None
     closes = _panel(data, "Close")
     if closes is None:
         closes = data.copy() if not isinstance(data.columns, pd.MultiIndex) else data
         closes.columns = [normalize_ticker(c) for c in closes.columns]
         closes = closes.dropna(axis=1, how="all")
     return closes, _panel(data, "Volume")
+
+
+def download_market(tickers: list[str]) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+    """Raw closes in small batches so Yahoo rate limits do not wipe the whole scan.
+
+    auto_adjust=False keeps dividend-unadjusted closes so the 50/200 match IBKR.
+    """
+    batch = 40
+    pause = 1.5
+    got_close: dict[str, pd.Series] = {}
+    got_vol: dict[str, pd.Series] = {}
+    pending = list(tickers)
+
+    for attempt in range(3):
+        if not pending:
+            break
+        if attempt:
+            wait = pause * (attempt + 1)
+            log(f"retrying {len(pending)} missing names after {wait:.0f}s (Yahoo rate limit)")
+            time.sleep(wait)
+        next_pending: list[str] = []
+        for i in range(0, len(pending), batch):
+            chunk = pending[i : i + batch]
+            closes, volumes = _download_chunk(chunk)
+            if closes is None or closes.empty:
+                next_pending.extend(chunk)
+            else:
+                for col in closes.columns:
+                    series = closes[col].dropna()
+                    if len(series) >= 200:
+                        got_close[col] = series
+                    else:
+                        next_pending.append(col)
+                if volumes is not None:
+                    for col in volumes.columns:
+                        if col in got_close:
+                            got_vol[col] = volumes[col]
+                missed = [t for t in chunk if t not in got_close]
+                next_pending.extend(missed)
+            time.sleep(pause)
+        pending = [t for t in dict.fromkeys(next_pending) if t not in got_close]
+        log(f"download pass {attempt + 1}: {len(got_close)}/{len(tickers)} names")
+
+    if not got_close:
+        return pd.DataFrame(), None
+    closes = pd.DataFrame(got_close).sort_index()
+    volumes = pd.DataFrame(got_vol).reindex(closes.index) if got_vol else None
+    return closes, volumes
 
 
 def download_benchmark() -> pd.Series | None:
@@ -569,14 +676,18 @@ def compression(close: pd.Series, line: pd.Series, look: int = 20) -> dict:
         return out
     px, lv = float(close.iloc[-1]), float(line.iloc[-1])
     then_px, then_lv = float(close.iloc[-1 - look]), float(line.iloc[-1 - look])
-    if lv <= 0 or then_lv <= 0:
+    if any(pd.isna(x) or math.isinf(x) for x in (px, lv, then_px, then_lv)) or lv <= 0 or then_lv <= 0:
         return out
     gap_now = (lv - px) / lv
     gap_then = (then_lv - then_px) / then_lv
+    if any(pd.isna(x) or math.isinf(x) for x in (gap_now, gap_then)):
+        return out
     lows_now = float(close.iloc[-look // 2:].min())
     lows_then = float(close.iloc[-look:-look // 2].min())
     rng_now = float(close.iloc[-look // 2:].max()) - lows_now
     rng_then = float(close.iloc[-look:-look // 2].max()) - lows_then
+    if any(pd.isna(x) for x in (lows_now, lows_then, rng_now, rng_then)):
+        return out
     score = 0
     why = []
     if gap_now < gap_then:
@@ -1106,7 +1217,7 @@ def inject(payload: dict) -> None:
     The HTML used to carry ~800 KB of embedded data, so every scan dirtied a tracked
     source file. Now the page loads scan_data.js and the HTML never changes.
     """
-    blob = json.dumps(payload, separators=(",", ":"))
+    blob = dumps_json(payload, separators=(",", ":"))
     tmp = SCRIPT_PATH.with_suffix(".js.tmp")
     tmp.write_text(f"window.SCAN_DATA = {blob};\n", encoding="utf-8")
     tmp.replace(SCRIPT_PATH)
@@ -1115,7 +1226,7 @@ def inject(payload: dict) -> None:
 def save_last(payload: dict) -> None:
     global LAST_PAYLOAD
     LAST_PAYLOAD = payload
-    DATA_PATH.write_text(json.dumps(payload), encoding="utf-8")
+    DATA_PATH.write_text(dumps_json(payload), encoding="utf-8")
     inject(payload)
 
 
@@ -1176,7 +1287,7 @@ def fetch_market_caps(tickers: list[str]) -> dict[str, float]:
         if ticker in cached:
             fresh[ticker] = cached[ticker]
             reused += 1
-    print(f"market caps: {len(fresh)}/{len(tickers)}  reused={reused}  still_blank={len(tickers) - len(fresh)}")
+    log(f"market caps: {len(fresh)}/{len(tickers)}  reused={reused}  still_blank={len(tickers) - len(fresh)}")
     return fresh
 
 
@@ -1203,7 +1314,7 @@ def fetch_earnings(tickers: list[str]) -> dict[str, str]:
             ticker, when = fut.result()
             if when:
                 out[ticker] = when
-    print(f"earnings dates: {len(out)}/{len(tickers)}")
+    log(f"earnings dates: {len(out)}/{len(tickers)}")
     return out
 
 
@@ -1236,8 +1347,17 @@ def add_earnings(all_rows: list[dict]) -> int:
 def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
     names, added, skipped = merge_universe(extra_from_ui)
     tickers = names["ticker"].tolist()
-    print(f"{datetime.now():%Y-%m-%d %H:%M:%S}  {len(tickers)} names  added={added}  skipped_dupes={skipped}")
+    log(f"{datetime.now():%Y-%m-%d %H:%M:%S}  {len(tickers)} names  added={added}  skipped_dupes={skipped}")
     closes, volumes = download_market(tickers)
+    got_n = 0 if closes is None or closes.empty else len(closes.columns)
+    need = max(1, int(0.85 * len(tickers)))
+    if got_n < need:
+        missing = [t for t in tickers if t not in (closes.columns if closes is not None else [])]
+        raise RuntimeError(
+            f"Yahoo only returned {got_n} of {len(tickers)} names (need ~{need}). "
+            f"Rate limited — wait a few minutes and scan once. "
+            f"Missing sample: {', '.join(missing[:12])}{'…' if len(missing) > 12 else ''}"
+        )
     bench = download_benchmark()
     info = names.set_index("ticker")
     skipped_short: list[str] = []
@@ -1298,7 +1418,8 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "engine": ENGINE,
         "earnings_warn_days": EARNINGS_WARN,
-        "universe": len(tickers),
+        "universe": len(all_rows),
+        "universe_requested": len(tickers),
         "close_pct": close_pct,
         "price_basis": "raw daily closes (split-adjusted, not dividend-adjusted) — matches IBKR",
         "market": market_state(last_bar),
@@ -1308,6 +1429,7 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
         "added": added,
         "skipped_duplicates": skipped,
         "skipped_short_history": skipped_short,
+        "download_missed": [t for t in tickers if t not in {r["ticker"] for r in all_rows} and t not in skipped_short],
         "extra_tickers": parse_ticker_list(list(EXTRA_TICKERS) + list(extra_from_ui or [])),
         "method_test": {
             "held": summarize_tests(
@@ -1330,22 +1452,24 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
         },
     }
     save_last(payload)
-    print(f"{len(hits)} watch hits · {len(all_rows)} universe rows")
+    log(f"{len(hits)} watch hits · {len(all_rows)} universe rows")
     return payload
 
 
 def make_handler(close_pct: float):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):
-            print(f"[watch] {self.address_string()} {fmt % args}")
+            log(f"[watch] {self.address_string()} {fmt % args}")
 
         def _cors(self):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            # Chrome blocks file:// → localhost POST without this private-network reply.
+            self.send_header("Access-Control-Allow-Private-Network", "true")
 
         def _json(self, code: int, payload: dict):
-            body = json.dumps(payload).encode("utf-8")
+            body = dumps_json(payload).encode("utf-8")
             self.send_response(code)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
@@ -1357,6 +1481,7 @@ def make_handler(close_pct: float):
         def do_OPTIONS(self):
             self.send_response(204)
             self._cors()
+            self.send_header("Content-Length", "0")
             self.end_headers()
 
         def _file(self, path: Path, mime: str):
@@ -1415,23 +1540,24 @@ def make_handler(close_pct: float):
 
 
 def serve(close_pct: float, port: int, open_browser: bool, autoscan: bool = False) -> None:
+    fix_stdio()
     try:
         install_protocol()
     except Exception as exc:
-        print("Could not register HTML launcher:", exc)
+        log(f"Could not register HTML launcher: {exc}")
 
     load_last()
     url = f"http://127.0.0.1:{port}/"
     if autoscan:
         url += "?autoscan=1"
     if port_busy(port):
-        print("Watcher already running — opening the page")
+        log("Watcher already running — opening the page")
         if open_browser:
             webbrowser.open(url)
         return
     httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(close_pct))
-    print(f"Watcher running at {url}")
-    print("Keep this window open.")
+    log(f"Watcher running at {url}")
+    log("Keep this window open.")
     if open_browser:
         webbrowser.open(url)
     httpd.serve_forever()
@@ -1449,7 +1575,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.protocol_url:
-        args.autoscan = False
+        args.no_open = True
     if args.install_protocol:
         install_protocol()
         raise SystemExit(0)
