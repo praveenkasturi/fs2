@@ -810,7 +810,7 @@
   </div>
 
   <div class="overlay" id="overlay">
-    <p>Scanning live prices<br><span>S&amp;P 500 plus extras · about one minute · keep the Python window open</span></p>
+    <p>Scanning live prices<br><span>S&amp;P 500 plus extras · about 1–2 minutes · the watcher is running in the background</span></p>
   </div>
 
   <!--SCAN_DATA-->
@@ -1700,7 +1700,7 @@
         if (sum0) sum0.innerHTML = `Tape read <em>— no scan yet — click to expand</em>`;
         const th0 = document.getElementById("thoughts");
         if (th0) th0.innerHTML = "";
-        grid.innerHTML = `<div class="empty">No scan loaded.<br><br>Start <code>Start_SP500_Watch.bat</code>, then click the gold <strong>Scan live data</strong> button once.<br>The scan is saved next to this page as <code>scan_data.js</code> — after that, opening this file shows the last snapshot.</div>`;
+        grid.innerHTML = `<div class="empty">No scan loaded yet.<br><br>FinSense is starting in the background. If Windows asks to open Python, click <strong>Open</strong>.<br>If nothing happens in 30 seconds, double-click this HTML file again.</div>`;
         renderMethod(null);
         return;
       }
@@ -2088,6 +2088,38 @@
       return false;
     }
 
+    function isFileOpen() {
+      return location.protocol === "file:";
+    }
+
+    function needsAutoscan() {
+      const d = window.SCAN_DATA;
+      return !d || !(d.all || d.hits);
+    }
+
+    async function bootFromFile() {
+      if (!isFileOpen()) return false;
+
+      setStatus("Opening FinSense…", "warn");
+
+      if (!await ping()) {
+        setStatus("Starting Python — if Windows asks, click Open.", "warn");
+        await startWatcherFromHtml();
+        if (!await waitForWatcher(30000)) {
+          if (window.SCAN_DATA) {
+            setStatus("Python did not start. Showing your last saved scan.", "warn");
+          } else {
+            setStatus("Python did not start. Double-click this HTML file again and click Open if Windows asks.", "warn");
+          }
+          return false;
+        }
+      }
+
+      const q = needsAutoscan() ? "?autoscan=1" : "";
+      location.replace("http://127.0.0.1:8765/" + q);
+      return true;
+    }
+
     async function startWatcherFromHtml() {
       setStatus("Starting Python… if Windows asks to open it, click Open.", "warn");
       const iframe = document.createElement("iframe");
@@ -2096,28 +2128,49 @@
       document.body.appendChild(iframe);
       setTimeout(() => iframe.remove(), 3000);
       if (await waitForWatcher(20000)) return true;
-      alert("Could not start Python from the page.\n\nDouble-click Start_SP500_Watch.bat in the same folder.\nIf Windows showed a prompt, click Open and try again.");
       return false;
     }
 
     async function scanNow() {
       const btn = document.getElementById("scanBtn");
       const overlay = document.getElementById("overlay");
+      // Never POST from file:// — Chrome aborts after OPTIONS and the scan never starts.
+      if (isFileOpen()) {
+        setStatus("Opening the live app…", "warn");
+        if (!await ping()) {
+          await startWatcherFromHtml();
+          if (!await waitForWatcher(30000)) {
+            setStatus("Python did not start. Double-click this HTML again and click Open if Windows asks.", "warn");
+            return;
+          }
+        }
+        location.replace("http://127.0.0.1:8765/?autoscan=1");
+        return;
+      }
       if (!await ping()) {
         const started = await startWatcherFromHtml();
-        if (!started) return;
+        if (!started) {
+          setStatus("Could not start Python. Double-click sp500_sma_watch.html in the FinSense folder.", "warn");
+          return;
+        }
       }
       localStorage.setItem(EXTRA_KEY, document.getElementById("extras").value);
       btn.disabled = true;
       overlay.classList.add("on");
-      setStatus("Scanning live data…", "warn");
+      setStatus("Scanning live data… this can take 1–2 minutes.", "warn");
       try {
         const r = await fetch(api("/api/scan"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ extra_tickers: extrasList() })
         });
-        const j = await r.json();
+        const text = await r.text();
+        let j;
+        try {
+          j = JSON.parse(text);
+        } catch (_) {
+          throw new Error("Scan returned bad data. Restart the FinSense Watcher window and scan again.");
+        }
         if (!r.ok) throw new Error(j.error || "Scan failed");
         window.SCAN_DATA = j;
         render();
@@ -2126,8 +2179,11 @@
         if (j.skipped_duplicates && j.skipped_duplicates.length) {
           parts.push("skipped duplicates already in S&P 500: " + j.skipped_duplicates.join(", "));
         }
+        if (j.download_missed && j.download_missed.length) {
+          parts.push(j.download_missed.length + " names missed by Yahoo");
+        }
         setStatus(
-          "Live scan finished · " + j.universe + " names · " + (parts.join(" · ") || "no extras"),
+          "Live scan finished · " + (j.all ? j.all.length : j.universe) + " names · " + (parts.join(" · ") || "no extras"),
           "ok"
         );
       } catch (err) {
@@ -2175,6 +2231,10 @@
         });
       });
       render();
+      if (isFileOpen()) {
+        await bootFromFile();
+        return;
+      }
       await ping();
       await loadLast();
       if (new URLSearchParams(location.search).get("autoscan") === "1") {
