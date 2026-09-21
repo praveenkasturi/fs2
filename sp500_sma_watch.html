@@ -69,7 +69,16 @@
     .chip-group .tab.on { background: var(--text); color: var(--bg); }
     .tab.buy-pack { background: #3dbe8c33; color: #5ee0b0; font-weight: 700; }
     .tab.buy-pack.on { background: #5ee0b0; color: #111; }
-    .tab.watch-pack { color: #e07048; }
+    .tab.watch-pack { color: #e7a23a; }
+    .tab.sell-pack { background: #e05d5d33; color: #f0b4b4; font-weight: 700; }
+    .tab.sell-pack.on { background: #e05d5d; color: #111; }
+    .call-flag { display: inline-block; font-size: 22px; font-weight: 800; letter-spacing: 0.14em; line-height: 1; }
+    .call-flag.buy { color: #2ee59a; text-shadow: 0 0 12px #2ee59a55; }
+    .call-flag.watch { color: #e7a23a; text-shadow: 0 0 12px #e7a23a44; }
+    .call-flag.sell { color: #e05d5d; text-shadow: 0 0 12px #e05d5d55; }
+    .badge.call-buy { background: #3dbe8c33; color: #5ee0b0; }
+    .badge.call-watch { background: #e7a23a33; color: #f0d4a8; }
+    .badge.call-sell { background: #e05d5d33; color: #f0b4b4; }
     .verdict { border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
     .verdict b { display: block; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
     .verdict.buy { background: #3dbe8c22; box-shadow: inset 0 0 0 1px #3dbe8c66; color: #cdeadd; }
@@ -113,6 +122,45 @@
     .lesson-charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
     .lesson-charts.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .lesson-charts.n1 { grid-template-columns: minmax(0, 280px); }
+    .pager { display: flex; gap: 6px; margin: 10px 0 0; }
+    .pager button {
+      background: transparent; color: var(--muted); border: 1px solid var(--stroke);
+      border-radius: 999px; padding: 6px 14px; font: 700 11px/1 "IBM Plex Sans", sans-serif;
+      letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer;
+    }
+    .pager button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+    body.on-desk .path,
+    body.on-desk .guide,
+    body.on-desk .chips,
+    body.on-desk .toolbar,
+    body.on-desk .stats,
+    body.on-desk .hint,
+    body.on-desk .note,
+    body.on-desk .tape,
+    body.on-desk #methodBox,
+    body.on-desk #extras { display: none !important; }
+    body.on-desk .live-row { justify-content: flex-end; }
+    body.on-desk .statebar { display: none; }
+    .mega-head { margin: 8px 0 22px; }
+    .mega-head h2 { font-size: 22px; letter-spacing: -0.03em; font-weight: 700; }
+    .mega-head p { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .mega-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+    .mega {
+      background: var(--card); box-shadow: var(--shadow); border-radius: 16px;
+      padding: 22px 22px 20px; cursor: pointer; min-height: 196px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .mega:hover { box-shadow: 0 0 0 1px #3d5a73; }
+    .mega .who { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+    .mega .tk { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; }
+    .mega .px { font-family: "IBM Plex Mono", monospace; font-size: 14px; color: var(--muted); }
+    .mega .side { font-size: 42px; font-weight: 800; letter-spacing: 0.08em; line-height: 0.95; }
+    .mega.buy .side { color: #2ee59a; }
+    .mega.wait .side { color: #e7a23a; }
+    .mega.sell .side { color: #e05d5d; }
+    .mega .why { font-size: 14px; line-height: 1.4; color: #c5ced8; }
+    .mega .path6 { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+    .mega .path6 b { color: var(--text); font-weight: 700; letter-spacing: 0.04em; }
     header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
     .kicker { color: var(--gold); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; font-weight: 600; margin-bottom: 6px; }
     h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; }
@@ -317,6 +365,19 @@
     .card-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
     .card-col .metrics { grid-template-columns: 1fr 1fr; }
     .card-col .metrics.plan { grid-template-columns: 1fr 1fr; }
+    .take { border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+    .take b { display: block; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+    .take ol { margin: 0 0 8px; padding-left: 18px; color: #c5ced8; }
+    .take li { margin: 0 0 5px; }
+    .take .rec { font-weight: 700; }
+    .take.skip { background: #e05d5d18; box-shadow: inset 0 0 0 1px #e05d5d55; }
+    .take.holdup { background: #e7a23a18; box-shadow: inset 0 0 0 1px #e7a23a55; }
+    .take.go { background: #3dbe8c18; box-shadow: inset 0 0 0 1px #3dbe8c55; }
+    details.work { margin-top: 4px; border-radius: 12px; background: var(--bg-2); box-shadow: inset 0 0 0 1px var(--stroke); padding: 8px 12px; }
+    details.work summary { cursor: pointer; color: var(--muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+    details.work[open] summary { margin-bottom: 10px; }
+    details.more-filters { margin-top: 8px; }
+    details.more-filters summary { cursor: pointer; color: var(--muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
     .card-foot {
       grid-column: 1 / -1;
       display: flex;
@@ -474,6 +535,10 @@
       <div>
         <div class="kicker">Daily scan · simple moving averages</div>
         <h1>S&amp;P 500 <span>50 / 200 watch</span></h1>
+        <div class="pager">
+          <button type="button" data-page="desk" class="on">Desk</button>
+          <button type="button" data-page="tape">Full tape</button>
+        </div>
       </div>
       <div class="meta" id="meta">No scan yet</div>
     </header>
@@ -786,7 +851,7 @@
     </details>
 
     <details class="guide" id="methodBox">
-      <summary>Method test <em>— after a break, did the retest reach the next SMA?</em></summary>
+      <summary>Method test <em>— next SMA, then +5% / +10% in 3 months and 6 months, by name</em></summary>
       <div id="methodBody"><p class="cap">Run <strong>Scan live data</strong> once. The main test: close through a SMA, then the first pullback that holds it — did price reach the next SMA before losing that line?</p></div>
     </details>
 
@@ -798,7 +863,7 @@
       <input class="search" id="search" type="search" placeholder="Type a ticker or name — TSLA, NVDA…" autocomplete="off" />
     </div>
     <div class="chips" id="chips"></div>
-    <p class="hint"><strong>BUY THIS</strong> = every check green after a confirmed break: it owns a line, two closes above it, not stretched, dip reads clean, money not leaving, RSI sane. Click a row to open the terminal desk. Switch names from the left list, or use ↑ ↓ / Esc. <strong>BREAK WATCH</strong> = the walk-up before the break — still under the line, still not a buy.</p>
+    <p class="hint"><strong>Call is the decision — BUY, WATCH, or SELL — on every name.</strong> It uses today’s setup plus this name’s own history. A green checklist is only “setup looks clean.” If the book loses, the call is SELL even when every box is green. Click a row for the 3-point why.</p>
     <details class="guide tape" id="tapeBox">
       <summary id="tapeSummary">Tape read <em>— click to expand</em></summary>
       <div class="thoughts" id="thoughts"></div>
@@ -888,16 +953,24 @@
     }
 
     function track(d) {
-      const vals = [d.price, d.sma50, d.sma200];
-      const min = Math.min(...vals) * 0.995, max = Math.max(...vals) * 1.005;
+      const px = d.price;
+      const vals = [px, d.sma50, d.sma200].filter(v => v);
+      // Centre on price and keep a floor of +/-3%, so a 0.5% gap looks small, not huge.
+      const far = Math.max.apply(null, vals.map(v => Math.abs(v - px)));
+      const half = Math.max(px * 0.03, far * 1.15);
+      const min = px - half, max = px + half;
       const items = [
         { v: d.sma50, c: "var(--blue)", l: "50" },
         { v: d.sma200, c: "var(--red)", l: "200" },
-        { v: d.price, c: "var(--text)", l: "Px" }
+        { v: px, c: "var(--text)", l: "Px" }
       ];
+      const away = v => !v ? "" : ((v - px) / px * 100);
+      const d50 = away(d.sma50), d200 = away(d.sma200);
+      const fmt = (v, n) => v === "" ? "—" : `${n} is ${v >= 0 ? "+" : ""}${v.toFixed(2)}% from price`;
       return `<div class="track"><div class="track-bar"></div>${items.map(it =>
         `<div class="mark" style="left:${pct(it.v, min, max)}%"><i style="background:${it.c}"></i><span>${it.l}</span></div>`
-      ).join("")}</div>`;
+      ).join("")}</div>
+      <p class="cap">${fmt(d50, "50")} · ${fmt(d200, "200")}. Scale is fixed at ±3% of price unless a line sits further out.</p>`;
     }
 
     function rsiBar(r) {
@@ -1257,7 +1330,49 @@
       if (d.flag_label) return { verdict: d.flag_verdict || "wait", label: d.flag_label, why: d.flag_why || "" };
       if (isDipStage(d)) return dipCheck(d);
       if (isTestStage(d)) return testCheck(d);
+      const tag = action(d).tag;
+      const why = d.stage_why || "";
+      if (tag === "HOLD") return { verdict: "wait", label: "HOLD", why };
+      if (tag === "RANGE") return { verdict: "wait", label: "RANGE", why };
+      if (tag === "CLEAR") return { verdict: "wait", label: "CLEAR", why };
+      if (tag) return { verdict: "wait", label: tag, why };
       return null;
+    }
+
+    function lineDays(d) {
+      if (d.entry_days_ago != null) return d.entry_days_ago;
+      if (d.line_run != null) return Math.abs(d.line_run);
+      return null;
+    }
+
+    function fillLevels(d, px) {
+      const { resist, support } = bands(d);
+      const picked = (d.line_px != null)
+        ? { name: d.line_name || "line", px: d.line_px, ceiling: d.line_kind === "ceiling" }
+        : support
+          ? { name: support.name, px: support.px, ceiling: false }
+          : resist
+            ? { name: resist.name, px: resist.px, ceiling: true }
+            : (d.sma50 ? { name: "50", px: d.sma50, ceiling: px < d.sma50 } : null);
+      if (!picked || !picked.px) {
+        return { ok: false, plan: "No 50 or 200 on this name yet." };
+      }
+      const stretchPct = (px - picked.px) / picked.px * 100;
+      const stop = Math.min(picked.px, px) * 0.98;
+      const kind = picked.ceiling ? "test" : "held";
+      return {
+        ok: true,
+        entry: picked.px,
+        last: px,
+        stop,
+        stretchPct,
+        nowRisk: Math.abs((px - stop) / px * 100),
+        days: lineDays(d),
+        date: d.entry_date || null,
+        near: Math.abs(stretchPct) <= 2.5,
+        kind,
+        plan: d.stage_why || ("Watching the " + picked.name + " at $" + picked.px.toFixed(2) + ".")
+      };
     }
 
     function levels(d) {
@@ -1289,7 +1404,7 @@
           stop,
           stretchPct,
           nowRisk: (px - stop) / px * 100,
-          days,
+          days: lineDays(d),
           date: d.entry_date,
           near: d.near_entry,
           kind: "dip",
@@ -1307,7 +1422,7 @@
           stop,
           stretchPct,
           nowRisk: (px - stop) / px * 100,
-          days: null,
+          days: lineDays(d),
           date: null,
           near: true,
           kind: "held",
@@ -1320,20 +1435,17 @@
           ok: true,
           entry: resist.px,
           last: px,
-          stop: resist.px * 0.98,
+          stop: Math.min(resist.px, px) * 0.98,
           stretchPct,
           nowRisk: Math.abs((px - resist.px) / px * 100),
-          days: null,
+          days: lineDays(d),
           date: null,
           near: true,
           kind: "test",
           plan: "Watch line is today’s " + resist.name + ". Do not buy this poke. Entry is a daily close through it, then a pullback that holds (GAME ON)."
         };
       }
-      if (d.regime === "bear") {
-        return { ok: false, plan: "Downtrend. An old 50-dip from the last uptrend does not count. Wait until it starts testing the nearer SMA." };
-      }
-      return { ok: false, plan: "No clean line in play. Wait for TEST (poke from below) or GAME ON (retest after a break)." };
+      return fillLevels(d, px);
     }
 
     function sortRailRows(rows) {
@@ -1369,14 +1481,12 @@
     function pickList(rows, active, totalInFilter) {
       const items = rows.map(d => {
         const a = action(d);
-        const fc = flagCheck(d);
-        const pack = d.pack === "BUY" ? "BUY THIS" : d.pack === "WATCH" ? "BREAK WATCH" : "";
-        const flag = pack || (fc ? fc.label : "");
+        const flag = finalCall(d).flag;
         return `<button type="button" class="pick ${d.ticker === active ? "on" : ""}" data-ticker="${d.ticker}">
           <span class="t">${d.ticker}</span>
           <span class="p">$${d.price.toFixed(2)}</span>
           <span class="s ${a.cls}">${a.tag}${earnSoon(d) ? " · EARN" : ""}</span>
-          ${flag ? `<span class="f">${flag}</span>` : ""}
+          ${flag ? `<span class="f call-flag ${flag.toLowerCase()}" style="font-size:12px">${flag}</span>` : ""}
         </button>`;
       }).join("");
       const countTxt = rows.length === totalInFilter
@@ -1394,6 +1504,180 @@
         </div>
         <div class="rail-list">${items || `<div class="empty" style="padding:24px 10px;font-size:12px">No match.</div>`}</div>
       </aside>`;
+    }
+
+    function touchOf(d, which) {
+      const t = which === "200" ? d.touch_200 : d.touch_50;
+      if (!t) return null;
+      if (t.from_top || t.from_bottom || t.visits || t.touches) return t;
+      return null;
+    }
+
+    function stairRead(t, sideNow) {
+      if (!t) return { txt: "—", clr: "var(--muted)", note: "No visits to this line yet.", decision: "thin" };
+      if (!t.from_top && t.touches) {
+        return {
+          txt: "RESCAN",
+          clr: "var(--amber)",
+          note: "This card still has the old 5% / 20-day count. Scan again so the stair (from-top vs from-bottom) can score it.",
+          decision: "wait"
+        };
+      }
+      const top = t.from_top || {};
+      const bot = t.from_bottom || {};
+      const topClosed = (top.bounce || 0) + (top.broke || 0);
+      const botClosed = (bot.through || 0) + (bot.rejected || 0);
+      const side = sideNow || t.now_side || "from_top";
+      const live = side === "from_bottom" ? bot : top;
+      const liveClosed = side === "from_bottom" ? botClosed : topClosed;
+      const rate = live.rate;
+      const dec = t.decision || "wait";
+      const clr = dec === "trust" ? "var(--growth)" : dec === "leave" ? "var(--red)" : dec === "thin" ? "var(--muted)" : "var(--amber)";
+      const word = dec === "trust" ? "TRUST" : dec === "leave" ? "LEAVE" : dec === "thin" ? "THIN" : "WAIT";
+      const txt = liveClosed < 8
+        ? `THIN · ${liveClosed} resolved`
+        : `${word} · ${rate == null ? "—" : rate + "%"}`;
+      const note = `From the top (dip): ${top.bounce || 0} bounce / ${top.broke || 0} broke`
+        + (top.chop ? ` · ${top.chop} chop` : "")
+        + `. From the bottom (test): ${bot.through || 0} through / ${bot.rejected || 0} rejected`
+        + (bot.chop ? ` · ${bot.chop} chop` : "")
+        + `. Chop = still hugging after ~2 months, not 90 days.`
+        + (t.decision_why ? " " + t.decision_why : "");
+      return { txt, clr, note, decision: dec };
+    }
+
+    function nearFifty(d) {
+      if (d.near_50 != null) return d.near_50 === true;
+      return d.near_entry === true;
+    }
+
+    function nearTwoHundred(d) {
+      if (d.near_200 != null) return d.near_200 === true;
+      return !!(d.sma200 && Math.abs(d.price / d.sma200 - 1) <= 0.025);
+    }
+
+    function bookOf(d) {
+      const tag = action(d).tag;
+      const book = (tag === "RIZZ" ? d.dip_book : d.held_book) || d.held_book || d.dip_book || {};
+      const wr = book.win_rate_closed;
+      const n = (book.wins || 0) + (book.losses || 0) || book.entries || 0;
+      const hit5 = book.hit5_3m_rate;
+      const hit10 = book.hit10_3m_rate;
+      const hit56 = book.hit5_6m_rate;
+      const hit106 = book.hit10_6m_rate;
+      const n3 = book.ready_3m || 0;
+      const n6 = book.ready_6m || 0;
+      const pool = ((((window.SCAN_DATA || {}).method_test || {}).held || {}).win_rate_closed);
+      const tradePays = n >= 10 && wr != null && (wr >= 52 || (pool != null && wr >= pool + 8));
+      const climbPays = (n3 >= 10 && hit5 != null && hit5 >= 55) || (n6 >= 10 && hit56 != null && hit56 >= 65);
+      const tradeFails = n >= 10 && wr != null && wr < 40;
+      const climbFails = n3 >= 10 && hit5 != null && hit5 < 40;
+      return {
+        book, wr, n, hit5, hit10, hit56, hit106, n3, n6,
+        pays: tradePays || climbPays,
+        fails: tradeFails && (climbFails || hit5 == null),
+        tradePays, climbPays
+      };
+    }
+
+    function takeRead(d) {
+      const tag = action(d).tag;
+      const sittingOn = nearFifty(d) ? "50" : nearTwoHundred(d) ? "200" : (d.line_name || null);
+      const stair = sittingOn === "200" ? (d.touch_200 || {}) : (d.touch_50 || {});
+      const b = bookOf(d);
+      const inSetup = tag === "GAME ON" || tag === "RIZZ" || tag === "GROWTH";
+      const holding = !!(d.line_kind === "support" && d.line_px && d.price >= d.line_px * 0.995) || holdsTheLine(d);
+      const lostLine = !!(d.line_kind === "support" && d.line_px && d.price < d.line_px * 0.98);
+      const dipLeave = (d.dip_verdict || "") === "leave";
+      const hot = d.rsi != null && d.rsi >= 75;
+      let flag = "WATCH";
+      let why = "Wait. Need a live hold of the line, or a name that actually pays this setup.";
+      let tone = "holdup";
+      if (d.signal === "DEATH_TODAY" || d.signal === "NEAR_DEATH") {
+        flag = "SELL"; why = "50 is losing the 200. Do not own this."; tone = "skip";
+      } else if (lostLine || tag === "AVOID") {
+        flag = "SELL"; why = tag === "AVOID" ? "Below both lines. Do not own this." : "Price already lost the line. Leave."; tone = "skip";
+      } else if (stair.decision === "leave" && (tag === "TEST" || tag === "AVOID" || !holding)) {
+        flag = "SELL"; why = "This line has been a trap from here. Do not own the poke."; tone = "skip";
+      } else if (stair.decision === "leave") {
+        flag = "WATCH"; why = "This line rejects from this side. Hold what you have — do not add."; tone = "holdup";
+      } else if (inSetup && b.fails) {
+        flag = "SELL"; why = "This name loses this trade. Green checks do not matter. Do not own it."; tone = "skip";
+      } else if (tag === "TEST") {
+        flag = "WATCH"; why = "First tap. Wait for a daily close through the line."; tone = "holdup";
+      } else if (inSetup && holding && !dipLeave && !hot && b.pays && earnSoon(d)) {
+        flag = "WATCH"; why = "This name pays, but earnings are soon. Wait for the print."; tone = "holdup";
+      } else if (inSetup && holding && !dipLeave && !hot && b.pays) {
+        flag = "BUY";
+        why = b.tradePays
+          ? "BUY. This name has paid the trade. Confirm the last bar on IBKR. Leave if a daily close loses the line."
+          : "BUY. This name usually climbs from here. Confirm the last bar on IBKR. Leave if a daily close loses the line.";
+        tone = "go";
+      } else if (inSetup && holding && !dipLeave && !hot && b.n < 10) {
+        flag = "WATCH"; why = "Setup is live, but the history is thin. If you take it, size small."; tone = "holdup";
+      } else if (inSetup && holding && d.pack === "BUY" && !b.fails) {
+        flag = "WATCH"; why = "Today is clean, but this name is only a coin flip. Size small or skip."; tone = "holdup";
+      }
+
+      const pts = [];
+      if (flag === "BUY") {
+        pts.push(sittingOn === "50" && d.sma200 && d.price < d.sma200
+          ? "Setup is live on the 50. First target is the 200 — take the walk, do not wait for a moonshot."
+          : "Setup is live. Price is holding the " + (sittingOn || d.line_name || "line") + ".");
+        if (b.tradePays) pts.push("This name has paid this trade (" + b.wr + "% of " + b.n + "). That is why this is a BUY.");
+        else if (b.climbPays && b.hit5 != null) pts.push("The tight target is mixed, but from here it climbs +5% in 3 months " + b.hit5 + "% of the time. That is why this is a BUY.");
+        else pts.push("The book supports a buy on this name.");
+        pts.push("Buy a small size. Stop is a daily close under the line. Confirm the last bar on IBKR.");
+      } else if (flag === "SELL") {
+        if (tag === "TEST" || tag === "AVOID") pts.push("Price is still under the line. This is not a buy.");
+        else if (sittingOn === "50" && d.sma200 && d.price < d.sma200) pts.push("Sitting on the 50, but this name does not pay the walk.");
+        else pts.push(why);
+        if (b.fails && b.wr != null) pts.push("This name’s own history loses this trade (" + b.wr + "% of " + b.n + "). Green boxes are about today, not about this stock paying.");
+        else if (stair.decision === "leave") pts.push("From this side the line has been a trap.");
+        if (b.n3 >= 8 && b.hit5 != null && b.hit5 < 45) pts.push("In 3 months it usually does not even climb 5%.");
+        else if (b.n3 >= 8 && b.hit10 != null && b.hit10 < 10) pts.push("A 10% climb almost never happens here.");
+      } else {
+        if (tag === "TEST") pts.push("Price is still under the line. A first tap is not a buy.");
+        else if (sittingOn === "50" && d.sma200 && d.price < d.sma200) pts.push("Sitting on the 50. The next job is a walk to the 200 — only buy if this name actually pays that walk.");
+        else if (sittingOn) pts.push("Price is on the " + sittingOn + ". Wait for a cleaner hold or a name that pays.");
+        else pts.push(action(d).why);
+        if (b.n >= 10 && b.wr != null && b.wr >= 45 && b.wr < 55) pts.push("This name is a coin flip on the tight trade (" + b.wr + "% of " + b.n + ").");
+        else if (b.n < 10) pts.push("Not enough finished trades to trust a percent here.");
+        if (earnSoon(d)) pts.push("Earnings soon. A gap can skip your stop overnight.");
+        else if (b.climbPays) pts.push("The climb is there if you can wait — but today’s setup is not clean enough to buy yet.");
+      }
+      return { pts: pts.slice(0, 3), rec: why, tone, flag, why };
+    }
+
+    function finalCall(d) {
+      const take = takeRead(d);
+      return { flag: take.flag, why: take.why, tone: take.tone };
+    }
+
+    function isFinalBuy(d) { return finalCall(d).flag === "BUY"; }
+    function isFinalWatch(d) { return finalCall(d).flag === "WATCH"; }
+    function isFinalSell(d) { return finalCall(d).flag === "SELL"; }
+
+    function tradeBox(d) {
+      const lv = levels(d);
+      if (!lv.ok) return "";
+      const other = d.line_name === "200" ? d.sma50 : d.sma200;
+      const toNext = other && other > d.price * 1.003;
+      const target = toNext ? other : d.price * 1.05;
+      return `<div class="metrics plan">
+          <div class="m"><div class="k">The line</div><div class="v" style="color:var(--blue)">$${lv.entry.toFixed(2)}</div></div>
+          <div class="m"><div class="k">Stop</div><div class="v" style="color:var(--red)">$${lv.stop.toFixed(2)}</div></div>
+          <div class="m"><div class="k">${toNext ? "Next line" : "+5%"}</div><div class="v" style="color:var(--green)">$${target.toFixed(2)}</div></div>
+          <div class="m"><div class="k">Now</div><div class="v">$${lv.last.toFixed(2)}</div></div>
+        </div>
+        <p class="cap">${lv.plan}</p>`;
+    }
+
+    function takeBox(d) {
+      const t = takeRead(d);
+      const call = finalCall(d);
+      const items = t.pts.map(p => `<li>${p}</li>`).join("");
+      return `<div class="take ${call.tone}"><b>Call</b><div class="call-flag ${call.flag.toLowerCase()}">${call.flag}</div><ol>${items}</ol><div class="rec">${call.why}</div></div>`;
     }
 
     function card(d, nav) {
@@ -1421,11 +1705,12 @@
       const dipBox = fc
         ? `<div class="dip-banner ${fc.verdict}"><b>${fc.label}</b>${fc.why}</div>`
         : "";
-      const verdictBox = d.pack === "BUY"
-        ? `<div class="verdict buy"><b>Buy this</b>${d.pack_why || ""}</div>${packChecks(d)}`
-        : d.pack === "WATCH"
-          ? `<div class="verdict watch"><b>Break watch — not a buy</b>${d.pack_why || ""}</div>`
-          : (d.pack_why ? `<div class="verdict none"><b>Not a buy yet</b>${d.pack_why}</div>${packChecks(d)}` : "");
+      const call = finalCall(d);
+      const verdictBox = call.flag === "BUY"
+        ? `<div class="verdict buy"><b>BUY</b>${call.why}</div>${packChecks(d)}`
+        : call.flag === "SELL"
+          ? `<div class="verdict watch"><b>SELL</b>${call.why}${d.pack === "BUY" ? " Today’s setup can look clean — that is not the call." : ""}</div>${d.pack ? packChecks(d) : ""}`
+          : `<div class="verdict none"><b>WATCH</b>${call.why}${d.pack === "BUY" ? " Today’s setup can look clean — that is not the call." : ""}</div>${d.pack ? packChecks(d) : ""}`;
       const earnBox = earnSoon(d)
         ? `<div class="verdict earn"><b>Earnings ${earnWords(d)}</b>The chart cannot see the number. A good setup can gap straight through your stop overnight, so either size small or wait for the print. Date is from Yahoo — confirm it before you act.</div>`
         : "";
@@ -1441,6 +1726,22 @@
           <div class="m"><div class="k">Coil into line</div><div class="v" style="font-size:14px">${coil == null ? "—" : coil + " / 3"}</div></div>
         </div>
         <p class="cap">${d.obv_why || ""}${coil != null && d.coil_why ? " · " + d.coil_why + "." : ""}</p>`;
+      const t50 = touchOf(d, "50");
+      const t200 = touchOf(d, "200");
+      const r50 = stairRead(t50);
+      const r200 = stairRead(t200);
+      const sittingOn = nearFifty(d) ? "50" : nearTwoHundred(d) ? "200" : null;
+      const sittingRead = sittingOn === "50" ? r50 : sittingOn === "200" ? r200 : null;
+      const touchBox = (t50 || t200)
+        ? `<div class="metrics">
+            <div class="m"><div class="k">50 stair${sittingOn === "50" ? " · here now" : ""}</div><div class="v" style="color:${r50.clr};font-size:13px">${r50.txt}</div></div>
+            <div class="m"><div class="k">200 stair${sittingOn === "200" ? " · here now" : ""}</div><div class="v" style="color:${r200.clr};font-size:13px">${r200.txt}</div></div>
+          </div>
+          <p class="cap"><strong>50:</strong> ${r50.note} <strong>200:</strong> ${r200.note}<br>
+          Last 3 years. Step 1 = walked down into the line (bounce vs broke). Step 2 = walked up into it (through vs rejected). Step 3 = the raise after a hold — that is the buy side.
+          ${sittingRead ? ` <strong>Price is on the ${sittingOn} right now, so the ${sittingOn} row is the one that matters today.</strong>` : ""}</p>`
+        : "";
+      const bookBox = bookLine(d.held_book, "GAME ON") + bookLine(d.dip_book, "RIZZ dip");
       const i = nav ? nav.index : -1;
       const n = nav ? nav.total : 0;
       const navBox = `<div class="card-nav">
@@ -1454,6 +1755,7 @@
             <div class="row" style="justify-content:flex-start;gap:12px;align-items:center">
               <div class="ticker">${d.ticker}</div>
               <div class="price">$${d.price.toFixed(2)}</div>
+              <span class="call-flag ${finalCall(d).flag.toLowerCase()}">${finalCall(d).flag}</span>
               <span class="badge ${d.signal}">${LABELS[d.signal]}</span>
             </div>
             <div class="${a.cls} call">${a.tag}</div>
@@ -1467,7 +1769,6 @@
           <div class="card-col">
             ${spark(d.spark)}
             ${track(d)}
-            <p class="cap">Bar below the line is a ruler of today’s levels, not a time chart. Left = cheapest of Price / 50 / 200. Right = most expensive.</p>
             <div class="metrics">
               <div class="m"><div class="k">50 SMA</div><div class="v" style="color:var(--blue)">${d.sma50.toFixed(2)}</div></div>
               <div class="m"><div class="k">200 SMA</div><div class="v" style="color:var(--red)">${d.sma200.toFixed(2)}</div></div>
@@ -1478,9 +1779,12 @@
               <div class="row"><span class="name">RSI 14</span><span class="v" style="font-family:IBM Plex Mono,monospace;font-size:12px">${d.rsi == null ? "—" : d.rsi.toFixed(1)}</span></div>
               ${rsiBar(d.rsi)}
             </div>
+            ${takeBox(d)}
           </div>
           <div class="card-col">
             ${flowBox}
+            ${touchBox}
+            ${bookBox}
             ${planBox}
             ${dipBox}
             ${earnBox}
@@ -1494,6 +1798,8 @@
       </article>`;
     }
 
+    const MEGA_CAP = 750e9;
+    let page = "desk";
     let filter = "ALL";
     let hideEarnings = false;
     let live = false;
@@ -1506,6 +1812,7 @@
     let railSearchCaret = null;
 
     const COLS = [
+      { key: "call", label: "Call", hint: "BUY / WATCH / SELL" },
       { key: "ticker", label: "Ticker" },
       { key: "name", label: "Name" },
       { key: "market_cap", label: "Mkt cap" },
@@ -1587,13 +1894,18 @@
     }
 
     function sortRows(rows) {
-      const numeric = { price: 1, sma50: 1, sma200: 1, gap_pct: 1, rsi: 1, market_cap: 1, entry: 1, stop: 1, stretch: 1, days: 1, dip: 1 };
+      const numeric = { price: 1, sma50: 1, sma200: 1, gap_pct: 1, rsi: 1, market_cap: 1, entry: 1, stop: 1, stretch: 1, days: 1, dip: 1, call: 1 };
       return rows.slice().sort((a, b) => {
         let va = a[sortKey];
         let vb = b[sortKey];
         if (sortKey === "signal") {
           va = LABELS[a.signal] || a.signal || "";
           vb = LABELS[b.signal] || b.signal || "";
+        }
+        if (sortKey === "call") {
+          const rank = { BUY: 3, WATCH: 2, SELL: 1 };
+          va = rank[finalCall(a).flag] || 0;
+          vb = rank[finalCall(b).flag] || 0;
         }
         if (sortKey === "dip") {
           va = a.dip_score == null ? -99 : a.dip_score;
@@ -1624,7 +1936,7 @@
         const mark = c.key === sortKey ? (sortDir === 1 ? " ▲" : " ▼") : "";
         return `<th data-key="${c.key}" class="${c.key === sortKey ? "on" : ""}">${c.label}${mark}${c.hint ? `<small>${c.hint}</small>` : ""}</th>`;
       }).join("");
-      return `<p class="name" style="margin:0 0 8px"><strong>Line</strong> = the dollar you are watching (support after a break, or the ceiling on a TEST). <strong>Days</strong> = how long since price last tagged it. <strong>Vs line</strong> = how far price is from that dollar now. <strong>Stop</strong> = leave if a daily close loses this. <strong>Flag</strong> = buy/leave the dip (GAME ON / RIZZ) or good/leave test (TEST / AVOID). <strong>Gap %</strong> = 50 vs 200 (green = 50 above, red = 50 below). <strong>Gap $</strong> = 50 minus 200 in dollars. Click a column to sort. Click a row to open the terminal desk (list left, detail right).</p>
+      return `<p class="name" style="margin:0 0 8px"><strong>Call</strong> = the decision on this name (BUY / WATCH / SELL). It uses today’s setup and this name’s history. Green checks alone are not a buy. <strong>Line</strong> = the dollar you are watching. <strong>Stop</strong> = leave if a daily close loses this. Click a row for the 3-point why.</p>
       <div class="table-wrap"><table class="uni">
         <thead><tr>${heads}</tr></thead>
         <tbody>${rows.map(d => {
@@ -1635,7 +1947,9 @@
           const a = action(d);
           const lv = levels(d);
           const hv = horizon(d);
+          const call = finalCall(d);
           return `<tr data-ticker="${d.ticker}" class="${selected === d.ticker ? "picked" : ""}">
+            <td><span class="badge call-${call.flag.toLowerCase()}">${call.flag}</span></td>
             <td><strong>${d.ticker}</strong><div class="${a.cls} call-sub">(${a.tag})</div>${isLong(d) ? `<div class="call-long call-sub">LONG · ${hv.hold}</div>` : (hv.hold !== "none" ? `<div class="call-sub">${hv.hold}</div>` : "")}${earnTag(d)}</td>
             <td>${d.name || ""}</td>
             <td class="num">${fmtCap(d.market_cap)}</td>
@@ -1673,20 +1987,148 @@
       const moodClr = b.mood === "strong" ? "var(--growth)" : b.mood === "weak" ? "var(--red)" : "var(--amber)";
       const breadthTxt = b.above_200 == null ? "" :
         `<span><span class="k">Market:</span> <span style="color:${moodClr}">${b.above_200}% of names above their 200</span> · ${b.above_50}% above the 50</span>`;
-      const packTxt = b.buy_pack == null ? "" :
-        `<span><span class="k">BUY THIS ${b.buy_pack}</span> · BREAK WATCH ${b.watch_pack}</span>`;
+      const buyN = all.filter(h => isFinalBuy(h)).length;
+      const watchN = all.filter(h => isFinalWatch(h)).length;
+      const sellN = all.filter(h => isFinalSell(h)).length;
+      const packTxt = `<span><span class="k">BUY ${buyN}</span> · WATCH ${watchN} · SELL ${sellN}</span>`;
       const earnTxt = b.earnings_soon ? `<span><span class="k">Earnings soon:</span> ${b.earnings_soon} names</span>` : "";
-      bar.innerHTML = `${pill}<span><span class="k">Bar:</span> ${dateTxt}</span>${warn}${breadthTxt}${packTxt}${earnTxt}
+      const ts = data.touch_summary;
+      let winTxt = "";
+      if (ts && ts.win_rate != null) {
+        const wr = ts.win_rate;
+        const clr = wr >= 60 ? "var(--growth)" : wr >= 45 ? "var(--amber)" : "var(--red)";
+        const t5 = ts.line_50 || {};
+        const t2 = ts.line_200 || {};
+        const bounce50 = t5.bounce_rate == null ? t5.win_rate : t5.bounce_rate;
+        const bounce200 = t2.bounce_rate == null ? t2.win_rate : t2.bounce_rate;
+        winTxt = `<span title="${ts.rule || ""}"><span class="k">From-top bounce (3y):</span> `
+          + `<span style="color:${clr}">${wr}%</span> · 50: ${bounce50 == null ? "—" : bounce50 + "%"} · 200: ${bounce200 == null ? "—" : bounce200 + "%"}</span>`;
+      }
+      bar.innerHTML = `${pill}<span><span class="k">Bar:</span> ${dateTxt}</span>${warn}${breadthTxt}${packTxt}${earnTxt}${winTxt}
         <span>Prices are raw closes — the 50/200 match your IBKR chart.</span>
         <span class="k">Engine ${data.engine || "v1"}</span>`;
     }
 
+    function isMega(d) {
+      return (d.market_cap || 0) >= MEGA_CAP;
+    }
+
+    function deskSide(d) {
+      if (d._deskForce) return d._deskForce;
+      const f = finalCall(d).flag;
+      if (f === "BUY") return "BUY";
+      if (f === "SELL") return "SELL";
+      return "WAIT";
+    }
+
+    function sixPath(d) {
+      const b = bookOf(d);
+      const n = b.n6 >= 8 ? b.n6 : b.n3;
+      const r10 = b.n6 >= 8 ? b.hit106 : b.hit10;
+      const r5 = b.n6 >= 8 ? b.hit56 : b.hit5;
+      if (n >= 8 && r10 != null && r10 >= 50) return "10% or more";
+      if (n >= 8 && r5 != null && r5 >= 50) return "5% to 10%";
+      if (n >= 8) return "less than 5%";
+      return "not enough history";
+    }
+
+    function deskWhy(d) {
+      if (d._deskWhy) return d._deskWhy;
+      const t = takeRead(d);
+      const side = deskSide(d);
+      if (side === "BUY") return t.pts[1] || t.why;
+      if (side === "WAIT") return t.why;
+      return t.pts[0] || t.why;
+    }
+
+    function deskPathLine(d, side) {
+      const path = sixPath(d);
+      if (side === "SELL") return "Out. The 6-month print does not matter if you do not own it.";
+      if (side === "WAIT") return "If the hold comes through · " + path;
+      return "Typical 6 months · " + path;
+    }
+
+    function foldMega(all) {
+      const by = {};
+      (all || []).filter(isMega).forEach(d => {
+        const key = d.ticker === "GOOGL" ? "GOOG" : d.ticker;
+        const row = d.ticker === "GOOGL" ? Object.assign({}, d, { ticker: "GOOG" }) : d;
+        const prev = by[key];
+        if (!prev) { by[key] = row; return; }
+        const a = deskSide(prev);
+        const b = deskSide(row);
+        if (a !== b) {
+          by[key] = Object.assign({}, (row.market_cap || 0) >= (prev.market_cap || 0) ? row : prev, {
+            ticker: key,
+            _deskForce: "WAIT",
+            _deskWhy: "GOOG and GOOGL do not agree today. Same company — sit."
+          });
+          return;
+        }
+        by[key] = (row.market_cap || 0) >= (prev.market_cap || 0) ? row : prev;
+      });
+      const rank = { BUY: 2, WAIT: 1, SELL: 0 };
+      return Object.values(by).sort((a, b) => {
+        const d = (rank[deskSide(b)] || 0) - (rank[deskSide(a)] || 0);
+        return d !== 0 ? d : (b.market_cap || 0) - (a.market_cap || 0);
+      });
+    }
+
+    function renderDesk(data, all) {
+      const grid = document.getElementById("grid");
+      const meta = document.getElementById("meta");
+      const names = foldMega(all);
+      if (!data || !all || !all.length) {
+        meta.textContent = "Mega-cap desk";
+        grid.innerHTML = `<div class="mega-head"><h2>The desk</h2><p>Names over $750B. Buy, wait, or sell. One reason. Then the typical 6-month move — only if you are in.</p></div><div class="empty">No scan yet. Hit <strong>Scan live data</strong>.</div>`;
+        return;
+      }
+      meta.innerHTML = `${names.length} names · $750B+`;
+      if (!names.length) {
+        grid.innerHTML = `<div class="mega-head"><h2>The desk</h2><p>Names over $750B.</p></div><div class="empty">No name over $750B in this scan. Open Full tape or scan again.</div>`;
+        return;
+      }
+      const cards = names.map(d => {
+        const side = deskSide(d);
+        return `<article class="mega ${side.toLowerCase()}" data-ticker="${d.ticker}">
+          <div class="who"><span class="tk">${d.ticker}</span><span class="px">$${d.price.toFixed(2)} · ${fmtCap(d.market_cap)}</span></div>
+          <div class="side">${side}</div>
+          <div class="why">${deskWhy(d)}</div>
+          <div class="path6">${deskPathLine(d, side)}</div>
+        </article>`;
+      }).join("");
+      grid.innerHTML = `<div class="mega-head"><h2>The desk</h2><p>Only names over $750B. Buy, wait, or sell. One reason. Six months is the typical print — not a promise, and not a reason to own a name you already sold.</p></div><div class="mega-grid">${cards}</div>`;
+      grid.querySelectorAll(".mega").forEach(el => {
+        el.onclick = () => {
+          selected = el.dataset.ticker;
+          page = "tape";
+          render();
+        };
+      });
+    }
+
+    function setPage(next) {
+      page = next;
+      selected = null;
+      render();
+    }
+
     function render() {
+      document.body.classList.toggle("on-desk", page === "desk");
+      document.querySelectorAll(".pager [data-page]").forEach(b => {
+        b.classList.toggle("on", b.dataset.page === page);
+      });
       const data = window.SCAN_DATA;
       const grid = document.getElementById("grid");
       const stats = document.getElementById("stats");
       const tabs = document.getElementById("tabs");
       const meta = document.getElementById("meta");
+
+      if (page === "desk") {
+        const all = data && (data.hits || data.all) ? universe(data) : [];
+        renderDesk(data, all);
+        return;
+      }
 
       if (!data || !(data.hits || data.all)) {
         meta.textContent = "No scan yet";
@@ -1700,7 +2142,7 @@
         if (sum0) sum0.innerHTML = `Tape read <em>— no scan yet — click to expand</em>`;
         const th0 = document.getElementById("thoughts");
         if (th0) th0.innerHTML = "";
-        grid.innerHTML = `<div class="empty">No scan loaded yet.<br><br>FinSense is starting in the background. If Windows asks to open Python, click <strong>Open</strong>.<br>If nothing happens in 30 seconds, double-click this HTML file again.</div>`;
+        grid.innerHTML = `<div class="empty">No scan loaded yet.<br><br><strong>Windows:</strong> double-click <code>Start_SP500_Watch.bat</code> and keep that window open.<br><strong>Mac:</strong> in Terminal, run <code>./Start_SP500_Watch.sh</code> or <code>python3 sp500_sma_watch.py --autoscan</code>.<br>Then this page is <code>http://127.0.0.1:8765/</code> — do not open the HTML file directly.</div>`;
         renderMethod(null);
         return;
       }
@@ -1732,7 +2174,8 @@
         return `<button class="tab ${filter === s ? "on" : ""}" data-s="${s}">${label} (${n})</button>`;
       }).join("");
       const longN = all.filter(h => isLong(h)).length;
-      const nearN = all.filter(h => h.near_entry).length;
+      const nearN = all.filter(h => nearFifty(h)).length;
+      const near200N = all.filter(h => nearTwoHundred(h)).length;
       const buyN = all.filter(h => isDipStage(h) && dipCheck(h).verdict === "buy").length;
       const leaveN = all.filter(h => isDipStage(h) && dipCheck(h).verdict === "leave").length;
       const goodTestN = all.filter(h => isTestStage(h) && testCheck(h).verdict === "good").length;
@@ -1740,8 +2183,10 @@
       const obvBestN = all.filter(h => obvRank(h) === "best").length;
       const obvOkN = all.filter(h => obvRank(h) === "ok").length;
       const obvLeaveN = all.filter(h => obvRank(h) === "leave").length;
-      const packN = all.filter(h => isBuyPack(h)).length;
-      const watchN = all.filter(h => isWatchPack(h)).length;
+      const packN = all.filter(h => isFinalBuy(h)).length;
+      const watchN = all.filter(h => isFinalWatch(h)).length;
+      const sellN = all.filter(h => isFinalSell(h)).length;
+      const setupN = all.filter(h => isBuyPack(h)).length;
       const earnN = all.filter(h => earnSoon(h)).length;
       const earnDays = data.earnings_warn_days || 7;
       chips.innerHTML = `<div class="chip-stack">
@@ -1751,14 +2196,17 @@
           <button class="tab ${filter === "OBV_OK" ? "on" : ""}" data-s="OBV_OK">OK (${obvOkN})</button>
           <button class="tab ${filter === "OBV_LEAVE" ? "on" : ""}" data-s="OBV_LEAVE">LEAVE (${obvLeaveN})</button>
         </div>
-        <div class="chip-group pack-row"><span class="chip-kicker">Pack</span>
-          <button class="tab buy-pack ${filter === "BUY_PACK" ? "on" : ""}" data-s="BUY_PACK">BUY THIS (${packN})</button>
-          <button class="tab watch-pack ${filter === "WATCH_PACK" ? "on" : ""}" data-s="WATCH_PACK">BREAK WATCH (${watchN})</button>
+        <div class="chip-group pack-row"><span class="chip-kicker">Call</span>
+          <button class="tab buy-pack ${filter === "BUY_PACK" ? "on" : ""}" data-s="BUY_PACK">BUY (${packN})</button>
+          <button class="tab watch-pack ${filter === "WATCH_PACK" ? "on" : ""}" data-s="WATCH_PACK">WATCH (${watchN})</button>
+          <button class="tab sell-pack ${filter === "SELL_PACK" ? "on" : ""}" data-s="SELL_PACK">SELL (${sellN})</button>
+          <button class="tab ${filter === "SETUP_PACK" ? "on" : ""}" data-s="SETUP_PACK">Setup clean (${setupN})</button>
           <button class="tab ${filter === "DIP_BUY" ? "on" : ""}" data-s="DIP_BUY">Buy the dip (${buyN})</button>
           <button class="tab ${filter === "DIP_LEAVE" ? "on" : ""}" data-s="DIP_LEAVE">Leave the dip (${leaveN})</button>
           <button class="tab ${filter === "TEST_GOOD" ? "on" : ""}" data-s="TEST_GOOD">Good test (${goodTestN})</button>
           <button class="tab ${filter === "TEST_LEAVE" ? "on" : ""}" data-s="TEST_LEAVE">Leave test (${leaveTestN})</button>
-          <button class="tab ${filter === "NEAR_ENTRY" ? "on" : ""}" data-s="NEAR_ENTRY">Near last 50-dip (${nearN})</button>
+          <button class="tab ${filter === "NEAR_ENTRY" ? "on" : ""}" data-s="NEAR_ENTRY">Near 50 (${nearN})</button>
+          <button class="tab ${filter === "NEAR_200" ? "on" : ""}" data-s="NEAR_200">Near 200 (${near200N})</button>
           <button class="tab ${filter === "CALL_LONG" ? "on" : ""}" data-s="CALL_LONG">LONG (${longN})</button>
           <button class="tab earn-off ${hideEarnings ? "on" : ""}" data-earn="1">Hide earnings ≤${earnDays}d (${earnN})</button>
         </div>
@@ -1786,7 +2234,9 @@
       } else if (filter === "BULL" || filter === "BEAR" || filter === "REPAIRING" || filter === "MIXED") {
         rows = all.filter(h => h.regime === filter.toLowerCase());
       } else if (filter === "NEAR_ENTRY") {
-        rows = all.filter(h => h.near_entry);
+        rows = all.filter(h => nearFifty(h));
+      } else if (filter === "NEAR_200") {
+        rows = all.filter(h => nearTwoHundred(h));
       } else if (filter === "CALL_LONG") {
         rows = all.filter(h => isLong(h));
       } else if (filter === "DIP_BUY") {
@@ -1798,9 +2248,13 @@
       } else if (filter === "TEST_LEAVE") {
         rows = all.filter(h => isTestStage(h) && testCheck(h).verdict === "leave");
       } else if (filter === "BUY_PACK") {
-        rows = all.filter(h => isBuyPack(h));
+        rows = all.filter(h => isFinalBuy(h));
       } else if (filter === "WATCH_PACK") {
-        rows = all.filter(h => isWatchPack(h));
+        rows = all.filter(h => isFinalWatch(h));
+      } else if (filter === "SELL_PACK") {
+        rows = all.filter(h => isFinalSell(h));
+      } else if (filter === "SETUP_PACK") {
+        rows = all.filter(h => isBuyPack(h));
       } else if (filter === "OBV_BEST" || filter === "OBV_OK" || filter === "OBV_LEAVE") {
         rows = all.filter(h => obvRank(h) === filter.slice(4).toLowerCase());
       } else if (filter.indexOf("OBV_") === 0) {
@@ -1896,6 +2350,54 @@
       }
     }
 
+    function pctTxt(v) { return v == null ? "—" : v + "%"; }
+
+    function bookLine(book, label) {
+      if (!book || !book.entries) return "";
+      return `<div class="metrics">
+          <div class="m"><div class="k">${label} book</div><div class="v" style="font-size:13px">${pctTxt(book.win_rate_closed)} trade · ${book.entries} events</div></div>
+          <div class="m"><div class="k">+5% / +10% in 3m</div><div class="v" style="font-size:13px">${pctTxt(book.hit5_3m_rate)} / ${pctTxt(book.hit10_3m_rate)}</div></div>
+          <div class="m"><div class="k">+5% / +10% in 6m</div><div class="v" style="font-size:13px">${pctTxt(book.hit5_6m_rate)} / ${pctTxt(book.hit10_6m_rate)}</div></div>
+        </div>
+        <p class="cap">This name only. Trade win = hit the target before a 2% close under the line (60 sessions). 3m / 6m = the close printed that high, even if the stop would have taken you out. Blank means that window is not finished yet.</p>`;
+    }
+
+    function climbLab(s) {
+      if (!s) return "";
+      return `<div class="lab">
+          <div class="m"><div class="k">+5% in 3 months</div><div class="v n" style="color:var(--green)">${s.hit5_3m == null ? "—" : s.hit5_3m}<div style="font-size:11px;margin-top:2px">${pctTxt(s.hit5_3m_rate)} of ${s.ready_3m || 0} finished</div></div></div>
+          <div class="m"><div class="k">+10% in 3 months</div><div class="v n">${s.hit10_3m == null ? "—" : s.hit10_3m}<div style="font-size:11px;margin-top:2px">${pctTxt(s.hit10_3m_rate)}</div></div></div>
+          <div class="m"><div class="k">+5% in 6 months</div><div class="v n" style="color:var(--green)">${s.hit5_6m == null ? "—" : s.hit5_6m}<div style="font-size:11px;margin-top:2px">${pctTxt(s.hit5_6m_rate)} of ${s.ready_6m || 0} finished</div></div></div>
+          <div class="m"><div class="k">+10% in 6 months</div><div class="v n">${s.hit10_6m == null ? "—" : s.hit10_6m}<div style="font-size:11px;margin-top:2px">${pctTxt(s.hit10_6m_rate)}</div></div></div>
+        </div>`;
+    }
+
+    function bookTable(book, title) {
+      if (!book) return "";
+      const elite = book.elite_80 || [];
+      const head = `<p class="cap" style="margin-top:16px"><strong>${title}</strong> ${book.names} names produced these events (median ${book.median_per_name == null ? "—" : book.median_per_name} per name). <strong>${book.elite_n} names</strong> have ≥80% trade win rate with at least ${book.min_closed} closed trades. ${book.honest_n} names have an honest Wilson floor ≥55%. A 3-for-3 is not 100% — that is why the 80% list needs ${book.min_closed}+ closed trades.</p>`;
+      if (!elite.length) {
+        return head + `<p class="cap">No name clears 80% with ${book.min_closed}+ closed trades yet. Scan again on engine v6, or the filter is doing its job.</p>`;
+      }
+      const rows = elite.map(b => `<tr data-open="${b.ticker}">
+          <td>${b.ticker}</td>
+          <td class="num">${b.closed}</td>
+          <td class="num">${pctTxt(b.win_rate_closed)}</td>
+          <td class="num">${pctTxt(b.wilson)}</td>
+          <td class="num">${pctTxt(b.hit5_3m_rate)}</td>
+          <td class="num">${pctTxt(b.hit10_3m_rate)}</td>
+          <td class="num">${pctTxt(b.hit5_6m_rate)}</td>
+          <td class="num">${pctTxt(b.hit10_6m_rate)}</td>
+        </tr>`).join("");
+      return head + `<div class="table-wrap"><table class="uni" style="min-width:720px">
+        <thead><tr>
+          <th>Name</th><th>Closed</th><th>Trade win</th><th>Honest floor</th>
+          <th>+5% 3m</th><th>+10% 3m</th><th>+5% 6m</th><th>+10% 6m</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+    }
+
     function renderMethod(data) {
       const el = document.getElementById("methodBody");
       if (!el) return;
@@ -1924,7 +2426,10 @@
           <div class="m"><div class="k">Still open</div><div class="v n">${held.open}</div></div>
           <div class="m"><div class="k">Stop</div><div class="v" style="font-size:12px">${held.stop}</div></div>
         </div>
-        <p class="cap" style="margin-top:10px">Yahoo daily closes, not IBKR fills. Win rate ignores timeouts. Target is the other SMA if it is still overhead, else +5%.</p>
+        <p class="cap" style="margin-top:10px">Yahoo daily closes, not IBKR fills. Trade win rate ignores timeouts. Target is the other SMA if it is still overhead, else +5%. The 20-day count is gone — that was the old 5% resolver, not this tape.</p>
+        <p class="cap" style="margin-top:12px"><strong>Same fills, hold clock — not the next SMA.</strong> Did the close ever print +5% or +10% in 3 months (63 sessions) or 6 months (126 sessions)? A name can lose the line as a trade and still tag +10% if you held. Unfinished windows are blank, not misses.</p>
+        ${climbLab(held)}
+        ${bookTable(t.held_book, "GAME ON by name — 80% club")}
         <p class="cap" style="margin-top:16px"><strong>TEST pokes (why we don’t buy the first tap).</strong> First time price walked up into an SMA from more than 2% below: did it break through, or back off?</p>
         <div class="lab">
           <div class="m"><div class="k">Pokes</div><div class="v n">${pokes.approaches || 0}</div></div>
@@ -1938,7 +2443,17 @@
           <div class="m"><div class="k">Hit +5% first</div><div class="v n" style="color:var(--green)">${dip.wins == null ? "—" : dip.wins}</div></div>
           <div class="m"><div class="k">Stopped first</div><div class="v n" style="color:var(--red)">${dip.losses == null ? "—" : dip.losses}</div></div>
           <div class="m"><div class="k">Win rate</div><div class="v n">${dwr}</div></div>
-        </div>`;
+        </div>
+        ${climbLab(dip)}
+        ${bookTable(t.dip_book, "RIZZ dips by name — 80% club")}`;
+      el.querySelectorAll("tr[data-open]").forEach(tr => {
+        tr.onclick = () => {
+          selected = tr.dataset.open;
+          const box = document.getElementById("methodBox");
+          if (box) box.open = false;
+          render();
+        };
+      });
     }
 
     function renderThoughts(all) {
@@ -1959,11 +2474,12 @@
       const longs = byCap(all.filter(r => isLong(r)));
       const dipBuys = byCap(all.filter(r => isDipStage(r) && dipCheck(r).verdict === "buy"));
       const dipLeaves = byCap(all.filter(r => isDipStage(r) && dipCheck(r).verdict === "leave"));
-      const packs = byCap(all.filter(r => isBuyPack(r)));
-      const watches = byCap(all.filter(r => isWatchPack(r)));
+      const packs = byCap(all.filter(r => isFinalBuy(r)));
+      const watches = byCap(all.filter(r => isFinalWatch(r)));
+      const sells = byCap(all.filter(r => isFinalSell(r)));
       const sum = document.getElementById("tapeSummary");
       if (sum) {
-        sum.innerHTML = `Tape read <em>— ${Math.round(100 * bull.length / n)}% uptrend · BUY THIS ${packs.length} · BREAK WATCH ${watches.length} · GAME ON ${helds.length} · RIZZ ${rizz.length} — click for the rest</em>`;
+        sum.innerHTML = `Tape read <em>— ${Math.round(100 * bull.length / n)}% uptrend · BUY ${packs.length} · WATCH ${watches.length} · SELL ${sells.length} · GAME ON ${helds.length} · RIZZ ${rizz.length} — click for the rest</em>`;
       }
       const br = (window.SCAN_DATA || {}).breadth || {};
       const moodLine = br.above_200 == null ? "" :
@@ -1978,12 +2494,15 @@
         `<p><strong>${Math.round(100 * bull.length / n)}%</strong> of the universe is in an uptrend (price above both averages, 50 above 200). <strong>${Math.round(100 * bear.length / n)}%</strong> is still in a downtrend.</p>`
       ].filter(Boolean);
       if (packs.length) {
-        parts.push(`<p class="up"><strong>BUY THIS — every check green.</strong> Owns a line, break confirmed by ${packs.length ? "consecutive closes" : ""}, not stretched, dip reads clean, money not leaving. Confirm the last bar on IBKR. ${nameList(packs, 6)}.</p>`);
+        parts.push(`<p class="up"><strong>BUY — setup clean and this name’s book pays.</strong> Confirm the last bar on IBKR. ${nameList(packs, 6)}.</p>`);
       } else {
-        parts.push("<p>No BUY THIS names. That pack is picky on purpose — the stair, the confirmed break, the dip flag and the money flow all have to agree.</p>");
+        parts.push("<p>No BUY names. Setup-clean is not enough — the name’s own history has to pay too.</p>");
+      }
+      if (sells.length) {
+        parts.push(`<p><strong>SELL — do not own.</strong> Lost the line, death cross, or this name loses the trade even when today’s boxes are green. ${nameList(sells, 8)}.</p>`);
       }
       if (watches.length) {
-        parts.push(`<p class="up"><strong>BREAK WATCH — not a buy.</strong> Walk-up into the line: within 5%, coming back, rising, OBV not dumping. Wait for a close through. ${nameList(watches, 5)}.</p>`);
+        parts.push(`<p class="up"><strong>WATCH — wait.</strong> First tap, thin history, or mixed book. Not a buy. ${nameList(watches, 5)}.</p>`);
       }
       if (growth.length) {
         parts.push(`<p class="up"><strong>GROWTH setups.</strong> Uptrend, sitting on the 50, 50 rising, RSI cooled, recent bounce. Confirm on a daily IBKR chart — not a buy list. ${nameList(growth, 6)}.</p>`);
@@ -2093,8 +2612,20 @@
     }
 
     function needsAutoscan() {
+      return scanIsStale();
+    }
+
+    function scanIsStale() {
       const d = window.SCAN_DATA;
-      return !d || !(d.all || d.hits);
+      if (!d || !(d.all || d.hits)) return true;
+      const gen = d.generated_at;
+      if (!gen) return true;
+      // "2026-09-02 21:31" → treat as local time
+      const t = Date.parse(String(gen).replace(" ", "T"));
+      if (!Number.isFinite(t)) return true;
+      const ageMs = Date.now() - t;
+      // Older than 18 hours → force a fresh live scan on open
+      return ageMs > 18 * 60 * 60 * 1000;
     }
 
     async function bootFromFile() {
@@ -2105,11 +2636,11 @@
       if (!await ping()) {
         setStatus("Starting Python — if Windows asks, click Open.", "warn");
         await startWatcherFromHtml();
-        if (!await waitForWatcher(30000)) {
+        if (!await waitForWatcher(45000)) {
           if (window.SCAN_DATA) {
-            setStatus("Python did not start. Showing your last saved scan.", "warn");
+            setStatus("Python did not start. Showing your last saved scan. Double-click Start_SP500_Watch.bat.", "warn");
           } else {
-            setStatus("Python did not start. Double-click this HTML file again and click Open if Windows asks.", "warn");
+            setStatus("Python did not start. Double-click Start_SP500_Watch.bat in the FinSense folder.", "warn");
           }
           return false;
         }
@@ -2198,6 +2729,9 @@
       const saved = localStorage.getItem(EXTRA_KEY);
       if (saved) document.getElementById("extras").value = saved;
       document.getElementById("scanBtn").onclick = scanNow;
+      document.querySelectorAll(".pager [data-page]").forEach(b => {
+        b.onclick = () => setPage(b.dataset.page);
+      });
       document.getElementById("search").addEventListener("input", render);
       document.addEventListener("keydown", ev => {
         if (ev.target && (ev.target.tagName === "INPUT" || ev.target.tagName === "TEXTAREA")) return;
@@ -2237,7 +2771,11 @@
       }
       await ping();
       await loadLast();
-      if (new URLSearchParams(location.search).get("autoscan") === "1") {
+      const wantScan = new URLSearchParams(location.search).get("autoscan") === "1" || scanIsStale();
+      if (wantScan) {
+        if (scanIsStale() && new URLSearchParams(location.search).get("autoscan") !== "1") {
+          setStatus("Scan data is stale — pulling live prices…", "warn");
+        }
         scanNow();
       }
     });

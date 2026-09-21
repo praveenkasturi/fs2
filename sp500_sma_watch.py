@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
+import numpy as np
 import pandas as pd
 import requests
 import yfinance as yf
@@ -84,6 +85,9 @@ STOP_UNDER_50 = 0.02
 ZONE_PCT = 0.02
 MAX_HOLD = 60
 NEAR_ENTRY_PCT = 0.025
+HORIZON_3M = 63       # ~3 months of sessions — path study, not the 60-day trade clock
+HORIZON_6M = 126      # ~6 months of sessions
+BOOK_MIN = 10         # closed trades before an 80% name-level win rate is worth reading
 
 OBV_LOOK = 10          # days of money flow to read
 OBV_IN = 0.10          # net flow >= 10% of traded volume counts as money coming in
@@ -93,7 +97,15 @@ HOLD_ZONE = 0.025      # how far above its line a name can sit and still be "hol
 CONFIRM_CLOSES = 2     # daily closes needed before a break counts
 RSI_BUY = (35, 68)     # RSI band allowed in the BUY THIS pack
 EARNINGS_WARN = 7      # flag a name reporting within this many days
-ENGINE = "v2"          # bumped when the scoring changes, shown on the page
+EV_BAND = 0.03         # inside 3% of the line counts as "at the line"
+EV_AWAY = 0.06         # must have been 6% away for the approach to be a real visit
+EV_GAP = 15            # sessions before the same line can start a new visit
+EV_FWD = 40            # sessions allowed to resolve a visit (~2 months)
+EV_K = 1.0             # barrier = k x daily vol x sqrt(horizon), so PG and NVDA are judged fairly
+EV_FLOOR = 0.02        # never use a barrier tighter than 2%
+EV_YEARS = 3           # history window for the record
+MODEL_MIN = 400        # events needed before the model is worth fitting
+ENGINE = "v6"          # per-name books + 3m/6m climb rates on the method tape
 
 # Add extra names here (Yahoo format: BRK-B not BRK.B).
 # Duplicates of S&P 500 names are skipped automatically.
@@ -110,31 +122,38 @@ PROTOCOL = "sp500watch"
 
 
 def install_protocol() -> None:
-    """Let the HTML button start this script via sp500watch:// (current user, no admin).
-
-    Browser protocol launches hide the console. Wrap with `start` so a real
-    black window opens and stays open while the watcher runs.
-    """
+    """Let the HTML button start this script via sp500watch:// (Windows only)."""
+    if sys.platform != "win32":
+        return
     import winreg
 
-    script = str(HTML_PATH.with_name("sp500_sma_watch.py"))
-    work = str(HERE)
-    # /D sets the working folder; title "FinSense Watcher" must come right after start.
-    cmd = (
-        f'cmd.exe /c start "FinSense Watcher" /D "{work}" '
-        f'"{sys.executable}" "{script}" --no-open'
-    )
+    bat = str(HERE / "Start_FinSense_Watcher.bat")
+    # Quoted path only — Windows appends the sp500watch:// URL; the bat ignores it.
+    cmd = f'"{bat}" "%1"'
     base = winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{PROTOCOL}")
     winreg.SetValueEx(base, "", 0, winreg.REG_SZ, "URL:SP500 SMA Watch")
     winreg.SetValueEx(base, "URL Protocol", 0, winreg.REG_SZ, "")
     cmd_key = winreg.CreateKey(base, r"shell\open\command")
     winreg.SetValueEx(cmd_key, "", 0, winreg.REG_SZ, cmd)
-    log("HTML one-click is enabled (sp500watch://) — opens a visible Python window")
+    log("HTML one-click is enabled (sp500watch://) — opens Start_FinSense_Watcher.bat")
 
 def port_busy(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(0.3)
         return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+def finsense_alive(port: int = PORT) -> bool:
+    """True only if our watcher is on the port — not a random http.server."""
+    if not port_busy(port):
+        return False
+    try:
+        r = requests.get(f"http://127.0.0.1:{port}/api/health", timeout=1.5)
+        if r.status_code != 200:
+            return False
+        return bool(r.json().get("ok"))
+    except Exception:
+        return False
 
 
 def normalize_ticker(raw: str) -> str:
@@ -214,7 +233,7 @@ def _download_chunk(tickers: list[str]) -> tuple[pd.DataFrame | None, pd.DataFra
     try:
         data = yf.download(
             tickers,
-            period="2y",
+            period="4y",
             interval="1d",
             auto_adjust=False,
             threads=True,
@@ -789,6 +808,8 @@ def pack_of(row: dict) -> dict:
     line_px = row.get("line_px")
     over = None if not line_px else (px - line_px) / line_px * 100
     run = row.get("line_run") or 0
+    held_line = row.get("line_name")
+    stair = (row.get("touch_200") if held_line == "200" else row.get("touch_50")) or {}
     checks = [
         {
             "label": "Stage is a buy stage",
@@ -830,6 +851,11 @@ def pack_of(row: dict) -> dict:
             "ok": row["signal"] not in ("NEAR_DEATH", "DEATH_TODAY"),
             "note": "50 is not losing the 200",
         },
+        {
+            "label": "Stair record agrees",
+            "ok": stair.get("decision") != "leave",
+            "note": stair.get("decision_why") or "no stair read yet",
+        },
     ]
     misses = [c["label"] for c in checks if not c["ok"]]
     if misses:
@@ -848,6 +874,179 @@ def pack_of(row: dict) -> dict:
         ),
         "pack_checks": checks,
     }
+
+
+def _wilson(success: int, n: int, z: float = 1.28) -> float | None:
+    """Lower 90% Wilson bound. Small samples stay humble instead of looking like 100%."""
+    if n < 1:
+        return None
+    p = success / n
+    den = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / den
+    spread = z * math.sqrt((p * (1 - p) + z * z / (4 * n)) / n) / den
+    return max(0.0, center - spread)
+
+
+def _empty_stair(name: str) -> dict:
+    return {
+        "line": name,
+        "visits": 0,
+        "from_top": {"n": 0, "bounce": 0, "broke": 0, "chop": 0, "rate": None},
+        "from_bottom": {"n": 0, "through": 0, "rejected": 0, "chop": 0, "rate": None},
+        "now_side": None,
+        "decision": "thin",
+        "decision_why": "Not enough visits to this line yet.",
+        "last_result": None,
+        "last_date": None,
+        "touches": 0,
+        "up": 0,
+        "down": 0,
+        "open": 0,
+        "win_rate": None,
+    }
+
+
+def stair_record(close: pd.Series, line: pd.Series, name: str) -> dict:
+    """Stair visits to one SMA, last 3 years.
+
+    Step 1 — from the top: price walked down into the line (a dip).
+      bounce = held it and walked away  ·  broke = closed 2% under it  ·  chop = still hugging
+    Step 2 — from the bottom: price walked up into the line (a test).
+      through = closed through and stayed  ·  rejected = backed off  ·  chop = still poking
+    Step 3 is the bounce after a from-the-top hold — that is the buy side.
+
+    Chop is not a 90-day clock. It is 'still on the line after ~2 months, never left.'
+    """
+    out = _empty_stair(name)
+    both = pd.concat([close.rename("px"), line.rename("lv")], axis=1).dropna()
+    if len(both) < 80:
+        return out
+    span = min(len(both), EV_YEARS * 252)
+    both = both.iloc[-span:]
+    px, lv = both["px"], both["lv"]
+    ret = px.pct_change().dropna()
+    n = len(px)
+    vol = float(ret.tail(60).std()) if len(ret) >= 20 else 0.02
+    if not math.isfinite(vol) or vol <= 0:
+        vol = 0.02
+    barrier = max(EV_FLOOR, EV_K * vol * math.sqrt(EV_FWD))
+
+    last_i = -EV_GAP - 1
+    for i in range(12, n):
+        line_i = float(lv.iloc[i])
+        price_i = float(px.iloc[i])
+        if line_i <= 0:
+            continue
+        dist = abs(price_i - line_i) / line_i
+        if dist > EV_BAND or i - last_i <= EV_GAP:
+            continue
+        prior = (px.iloc[i - 10:i] - lv.iloc[i - 10:i]).abs() / lv.iloc[i - 10:i]
+        if prior.max() < EV_AWAY:
+            continue
+        prev_px, prev_lv = float(px.iloc[i - 1]), float(lv.iloc[i - 1])
+        side = "from_top" if prev_px >= prev_lv else "from_bottom"
+        last_i = i
+        out["visits"] += 1
+        bucket = out[side]
+        bucket["n"] += 1
+        result = "chop"
+        end = min(i + EV_FWD, n - 1)
+        if side == "from_top":
+            for j in range(i + 1, end + 1):
+                now, now_lv = float(px.iloc[j]), float(lv.iloc[j])
+                if now_lv <= 0:
+                    continue
+                if now <= now_lv * 0.98:
+                    result = "broke"
+                    break
+                if now >= now_lv * (1 + barrier):
+                    result = "bounce"
+                    break
+            if result == "bounce":
+                bucket["bounce"] += 1
+            elif result == "broke":
+                bucket["broke"] += 1
+            else:
+                bucket["chop"] += 1
+        else:
+            held = 0
+            for j in range(i + 1, end + 1):
+                now, now_lv = float(px.iloc[j]), float(lv.iloc[j])
+                if now_lv <= 0:
+                    continue
+                if now >= now_lv:
+                    held += 1
+                    if held >= 2:
+                        result = "through"
+                        break
+                else:
+                    held = 0
+                    if now <= now_lv * (1 - EV_BAND):
+                        result = "rejected"
+                        break
+            if result == "through":
+                bucket["through"] += 1
+            elif result == "rejected":
+                bucket["rejected"] += 1
+            else:
+                bucket["chop"] += 1
+        out["last_result"] = result
+        out["last_date"] = px.index[i].strftime("%Y-%m-%d")
+
+    top, bot = out["from_top"], out["from_bottom"]
+    top_closed = top["bounce"] + top["broke"]
+    bot_closed = bot["through"] + bot["rejected"]
+    top["rate"] = None if not top_closed else round(100.0 * top["bounce"] / top_closed, 1)
+    bot["rate"] = None if not bot_closed else round(100.0 * bot["through"] / bot_closed, 1)
+
+    last_px, last_lv = float(px.iloc[-1]), float(lv.iloc[-1])
+    if last_lv > 0 and abs(last_px - last_lv) / last_lv <= EV_BAND:
+        look = px.iloc[-15:-1]
+        look_lv = lv.iloc[-15:-1]
+        if len(look) and float(look.iloc[0]) >= float(look_lv.iloc[0]):
+            out["now_side"] = "from_top"
+        else:
+            out["now_side"] = "from_bottom"
+
+    side = out["now_side"] or "from_top"
+    useful = out[side]
+    if side == "from_top":
+        wins, closed = useful["bounce"], useful["bounce"] + useful["broke"]
+    else:
+        wins, closed = useful["through"], useful["through"] + useful["rejected"]
+    floor = _wilson(wins, closed)
+    if closed < 8:
+        out["decision"] = "thin"
+        out["decision_why"] = f"Only {closed} resolved {name}-line visits from this side — not enough to trust."
+    elif floor is not None and floor >= 0.55:
+        out["decision"] = "trust" if side == "from_top" else "wait"
+        out["decision_why"] = (
+            f"From the top, the {name} has bounced {useful['rate']}% of the time — this is the buy side."
+            if side == "from_top"
+            else f"From below, the {name} eventually went through {useful['rate']}% of the time. Still wait for a close through — not a buy under the line."
+        )
+    elif floor is not None and floor < 0.40:
+        out["decision"] = "leave"
+        out["decision_why"] = (
+            f"From the top, the {name} broke more than it bounced. Do not treat this dip as support."
+            if side == "from_top"
+            else f"From below, pokes of the {name} usually fail. Leave the test."
+        )
+    else:
+        out["decision"] = "wait"
+        out["decision_why"] = f"The {name} is a coin flip from this side. The checklist can still be green — size small or skip."
+
+    out["touches"] = out["visits"]
+    out["up"] = top["bounce"] + bot["through"]
+    out["down"] = top["broke"] + bot["rejected"]
+    out["open"] = top["chop"] + bot["chop"]
+    closed_all = out["up"] + out["down"]
+    out["win_rate"] = None if not closed_all else round(100.0 * out["up"] / closed_all, 1)
+    return out
+
+
+def touch_record(close: pd.Series, line: pd.Series, name: str) -> dict:
+    return stair_record(close, line, name)
 
 
 def method_events(close: pd.Series) -> tuple[dict | None, list[dict]]:
@@ -883,6 +1082,29 @@ def method_events(close: pd.Series) -> tuple[dict | None, list[dict]]:
     }, tests
 
 
+def _mark_horizons(event: dict, close: pd.Series, i: int, entry: float) -> dict:
+    """Path study from the fill: did the close ever print +5% / +10% in 3m or 6m?
+
+    This ignores the trade stop. A name can stop you out and still tag +10% if you held.
+    A window that has not finished is left blank — not counted as a miss.
+    """
+    n = len(close)
+    for label, span in (("3m", HORIZON_3M), ("6m", HORIZON_6M)):
+        end = i + span
+        if end >= n:
+            event[f"hit5_{label}"] = None
+            event[f"hit10_{label}"] = None
+            event[f"ready_{label}"] = False
+            continue
+        window = close.iloc[i + 1 : end + 1]
+        mx = float(window.max()) if len(window) else entry
+        ret = mx / entry - 1.0 if entry else 0.0
+        event[f"hit5_{label}"] = bool(ret >= 0.05)
+        event[f"hit10_{label}"] = bool(ret >= 0.10)
+        event[f"ready_{label}"] = True
+    return event
+
+
 def _forward_from(close: pd.Series, sma50: pd.Series, idxs: list[int]) -> list[dict]:
     tests: list[dict] = []
     n = len(close)
@@ -909,7 +1131,7 @@ def _forward_from(close: pd.Series, sma50: pd.Series, idxs: list[int]) -> list[d
                 "days": hold_end - i,
                 "pct": round((px / entry - 1) * 100, 2),
             }
-        tests.append(resolved)
+        tests.append(_mark_horizons(resolved, close, i, entry))
     return tests
 
 
@@ -1001,7 +1223,7 @@ def held_events(close: pd.Series) -> list[dict]:
                     "days": hold_end - entry_j,
                     "pct": round((px / entry - 1) * 100, 2),
                 }
-            tests.append(resolved)
+            tests.append(_mark_horizons(resolved, close, entry_j, entry))
     return tests
 
 
@@ -1030,6 +1252,58 @@ def summarize_tests(tests: list[dict], rule: str | None = None, stop: str | None
             "Full uptrend only: first dip into ~2% of the 50, coming from more than 2% above it. "
             "Then +5% before a close 2% under the 50, max 60 sessions. Last stair — 50 is already support."
         ),
+        **_horizon_rates(tests),
+    }
+
+
+def _horizon_rates(tests: list[dict]) -> dict:
+    out: dict = {}
+    for label in ("3m", "6m"):
+        ready = [t for t in tests if t.get(f"ready_{label}")]
+        n = len(ready)
+        out[f"ready_{label}"] = n
+        for thr in (5, 10):
+            key = f"hit{thr}_{label}"
+            hits = sum(1 for t in ready if t.get(key))
+            out[key] = hits
+            out[f"{key}_rate"] = None if not n else round(100.0 * hits / n, 1)
+    return out
+
+
+def name_books(events: list[dict], min_closed: int = BOOK_MIN) -> dict:
+    """One book per ticker. 80% raw is shown only with enough closed trades.
+
+    Wilson is the honest floor — a 5-for-5 name is not 100%, it is still thin.
+    """
+    by: dict[str, list] = {}
+    for e in events:
+        by.setdefault(e.get("ticker") or "?", []).append(e)
+    books = []
+    for ticker, evs in by.items():
+        s = summarize_tests(evs)
+        s["ticker"] = ticker
+        s["name"] = evs[0].get("name") or ""
+        closed = s["wins"] + s["losses"]
+        floor = _wilson(s["wins"], closed)
+        s["wilson"] = None if floor is None else round(100.0 * floor, 1)
+        s["closed"] = closed
+        books.append(s)
+    books.sort(key=lambda b: ((b.get("win_rate_closed") or 0), b["wins"]), reverse=True)
+    elite = [b for b in books if (b.get("win_rate_closed") or 0) >= 80 and b["closed"] >= min_closed]
+    honest = [
+        b for b in books
+        if b.get("wilson") is not None and b["wilson"] >= 55 and b["closed"] >= min_closed
+    ]
+    honest.sort(key=lambda b: (b["wilson"] or 0, b["wins"]), reverse=True)
+    counts = [b["entries"] for b in books]
+    return {
+        "names": len(books),
+        "median_per_name": None if not counts else int(sorted(counts)[len(counts) // 2]),
+        "elite_80": elite[:40],
+        "honest": honest[:40],
+        "elite_n": len(elite),
+        "honest_n": len(honest),
+        "min_closed": min_closed,
     }
 
 
@@ -1180,6 +1454,13 @@ def classify(
 
     row.update(dip_quality(close, series[support[0]] if support else None, support[0] if support else "line", volume))
     row.update(test_quality(close, sma50, sma200, volume, signal))
+
+    # How this name has behaved near each line for the last 3 years.
+    row["touch_50"] = touch_record(close, sma50, "50")
+    row["touch_200"] = touch_record(close, sma200, "200")
+    row["near_50"] = bool(abs(float(px) / float(s50) - 1) <= NEAR_ENTRY_PCT)
+    row["near_200"] = bool(abs(float(px) / float(s200) - 1) <= NEAR_ENTRY_PCT)
+
     row.update(pack_of(row))
 
     if row["stage"] in ("TEST", "AVOID"):
@@ -1378,8 +1659,18 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
         result["ticker"] = ticker
         result["name"] = "" if meta is None else str(meta["name"])
         result["sector"] = "" if meta is None else str(meta["sector"])
-        all_tests.extend(result.pop("_tests", []))
-        all_held.extend(result.pop("_held", []))
+        tests = result.pop("_tests", [])
+        held = result.pop("_held", [])
+        for ev in tests:
+            ev["ticker"] = ticker
+            ev["name"] = result["name"]
+        for ev in held:
+            ev["ticker"] = ticker
+            ev["name"] = result["name"]
+        result["dip_book"] = summarize_tests(tests)
+        result["held_book"] = summarize_tests(held)
+        all_tests.extend(tests)
+        all_held.extend(held)
         pokes = result.pop("_pokes", {})
         for key in poke_tot:
             poke_tot[key] += int(pokes.get(key, 0) or 0)
@@ -1412,6 +1703,45 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
         else "mixed" if breadth["above_200"] >= 40
         else "weak"
     )
+
+    def roll_stair(key: str) -> dict:
+        bounce = sum((r.get(key) or {}).get("from_top", {}).get("bounce", 0) for r in all_rows)
+        broke = sum((r.get(key) or {}).get("from_top", {}).get("broke", 0) for r in all_rows)
+        through = sum((r.get(key) or {}).get("from_bottom", {}).get("through", 0) for r in all_rows)
+        rejected = sum((r.get(key) or {}).get("from_bottom", {}).get("rejected", 0) for r in all_rows)
+        chop = sum((r.get(key) or {}).get("open", 0) for r in all_rows)
+        top_n = bounce + broke
+        bot_n = through + rejected
+        return {
+            "from_top": bounce,
+            "broke": broke,
+            "through": through,
+            "rejected": rejected,
+            "chop": chop,
+            "bounce_rate": None if not top_n else round(100.0 * bounce / top_n, 1),
+            "through_rate": None if not bot_n else round(100.0 * through / bot_n, 1),
+            "win_rate": None if not top_n else round(100.0 * bounce / top_n, 1),
+        }
+
+    t50 = roll_stair("touch_50")
+    t200 = roll_stair("touch_200")
+    top_closed = (t50["from_top"] + t50["broke"]) + (t200["from_top"] + t200["broke"])
+    top_wins = t50["from_top"] + t200["from_top"]
+    touch_summary = {
+        "line_50": t50,
+        "line_200": t200,
+        "win_rate": None if not top_closed else round(100.0 * top_wins / top_closed, 1),
+        "band_pct": round(EV_BAND * 100),
+        "window_days": EV_FWD,
+        "years": EV_YEARS,
+        "rule": (
+            f"Last {EV_YEARS} years. From the top: walked down into the line — bounce vs broke. "
+            f"From the bottom: walked up into the line — through vs rejected. "
+            f"Chop = still hugging after {EV_FWD} sessions (~2 months), not 90 days. "
+            "Dashboard win % is bounce rate from the top — that is the buy side."
+        ),
+    }
+    breadth["touch_win_rate"] = touch_summary["win_rate"]
     last_bar = closes.index[-1] if len(closes.index) else datetime.now()
 
     payload = {
@@ -1424,6 +1754,7 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
         "price_basis": "raw daily closes (split-adjusted, not dividend-adjusted) — matches IBKR",
         "market": market_state(last_bar),
         "breadth": breadth,
+        "touch_summary": touch_summary,
         "hits": hits,
         "all": all_rows,
         "added": added,
@@ -1442,6 +1773,8 @@ def scan(close_pct: float, extra_from_ui: list[str] | None = None) -> dict:
                 stop="daily close 2% under the held SMA",
             ),
             "dip": summarize_tests(all_tests),
+            "held_book": name_books(all_held),
+            "dip_book": name_books(all_tests),
             "pokes": {
                 **poke_tot,
                 # Only pokes that actually resolved. Ones still running are not failures.
@@ -1539,6 +1872,18 @@ def make_handler(close_pct: float):
     return Handler
 
 
+def _hold_window(seconds: float = 8.0) -> None:
+    """Keep a console visible long enough to read a message (protocol/bat launches)."""
+    try:
+        if sys.stdin and sys.stdin.isatty():
+            log("Press Enter to close this window.")
+            input()
+            return
+    except Exception:
+        pass
+    time.sleep(seconds)
+
+
 def serve(close_pct: float, port: int, open_browser: bool, autoscan: bool = False) -> None:
     fix_stdio()
     try:
@@ -1550,17 +1895,38 @@ def serve(close_pct: float, port: int, open_browser: bool, autoscan: bool = Fals
     url = f"http://127.0.0.1:{port}/"
     if autoscan:
         url += "?autoscan=1"
-    if port_busy(port):
-        log("Watcher already running — opening the page")
+
+    if finsense_alive(port):
+        log("FinSense watcher already running at " + url)
+        log("This window can close — the other FinSense Watcher is serving the page.")
         if open_browser:
             webbrowser.open(url)
+        _hold_window(6)
         return
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(close_pct))
+
+    if port_busy(port):
+        log(f"Port {port} is taken by another program (not FinSense).")
+        log("Close that program, then start again.")
+        log('Tip: Task Manager → python.exe running "http.server" → End task')
+        _hold_window(12)
+        raise SystemExit(1)
+
+    try:
+        httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(close_pct))
+    except OSError as exc:
+        log(f"Could not bind port {port}: {exc}")
+        _hold_window(10)
+        raise SystemExit(1)
     log(f"Watcher running at {url}")
     log("Keep this window open.")
     if open_browser:
         webbrowser.open(url)
-    httpd.serve_forever()
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        log("Stopped.")
+    finally:
+        httpd.server_close()
 
 
 if __name__ == "__main__":
@@ -1574,8 +1940,10 @@ if __name__ == "__main__":
     parser.add_argument("protocol_url", nargs="?", help="Filled in when launched from the HTML button")
     args = parser.parse_args()
 
-    if args.protocol_url:
+    # Bat / protocol may pass sp500watch://… — ignore it, stay headless for the server.
+    if args.protocol_url and str(args.protocol_url).lower().startswith(f"{PROTOCOL}:"):
         args.no_open = True
+        args.protocol_url = None
     if args.install_protocol:
         install_protocol()
         raise SystemExit(0)
