@@ -49,6 +49,8 @@ The page opens at http://127.0.0.1:8765/
 
 Do not double-click the HTML in Finder or Explorer. Use the local page above.
 
-## Desk vs full tape
+## Desk vs full tape vs Simple
 
-The home page is **Desk**: names over $750B, BUY / WAIT / SELL. **Full tape** is the whole S&P screen.
+- **Simple** (home): BUY / WAIT / SELL plus plain yes/no checks. No jargon.
+- **Desk**: mega-caps ($750B+) only, short cards.
+- **Full tape**: full S&P screen with stages, books, and filters.
