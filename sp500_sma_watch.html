@@ -138,9 +138,140 @@
     body.on-desk .note,
     body.on-desk .tape,
     body.on-desk #methodBox,
-    body.on-desk #extras { display: none !important; }
-    body.on-desk .live-row { justify-content: flex-end; }
-    body.on-desk .statebar { display: none; }
+    body.on-desk #extras,
+    body.on-simple .path,
+    body.on-simple .guide,
+    body.on-simple .chips,
+    body.on-simple .toolbar,
+    body.on-simple .stats,
+    body.on-simple .hint,
+    body.on-simple .note,
+    body.on-simple .tape,
+    body.on-simple #methodBox,
+    body.on-simple #extras { display: none !important; }
+    body.on-desk .live-row,
+    body.on-simple .live-row { justify-content: flex-end; }
+    body.on-desk .statebar,
+    body.on-simple .statebar { display: none; }
+    .simple-head { margin: 4px 0 18px; }
+    .simple-head h2 { font-size: 22px; letter-spacing: -0.03em; font-weight: 700; }
+    .simple-head p { color: var(--muted); font-size: 13px; margin-top: 6px; max-width: 42em; }
+    .simple-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 0 0 16px; }
+    .simple-tools input {
+      flex: 1; min-width: 180px; height: 40px;
+      background: var(--bg-2); color: var(--text); border: 1px solid var(--stroke);
+      border-radius: 10px; padding: 0 12px; font: 400 14px/40px "IBM Plex Sans", sans-serif; outline: none;
+    }
+    .simple-tools .chip {
+      height: 36px; border: 1px solid var(--stroke); background: transparent; color: var(--muted);
+      border-radius: 999px; padding: 0 14px; font: 700 11px/36px "IBM Plex Sans", sans-serif;
+      letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+    }
+    .simple-tools .chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+    .simple-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .simple-card {
+      background: var(--card); box-shadow: var(--shadow); border-radius: 16px;
+      padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 10px;
+      min-height: 0; cursor: pointer; transition: box-shadow 0.15s ease;
+    }
+    .simple-card:hover { box-shadow: 0 0 0 1px #3d5a73; }
+    .simple-card.open { box-shadow: 0 0 0 1px #5b8def; }
+    .simple-card .who { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+    .simple-card .tk {
+      font-size: 22px; font-weight: 800; letter-spacing: -0.02em; line-height: 1;
+    }
+    .simple-card.buy .tk { color: #2ee59a; }
+    .simple-card.wait .tk { color: #e7a23a; }
+    .simple-card.sell .tk { color: #e05d5d; }
+    .simple-card .px { color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+    .simple-card .side {
+      font-size: 13px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+    }
+    .simple-card.buy .side { color: #2ee59a; }
+    .simple-card.wait .side { color: #e7a23a; }
+    .simple-card.sell .side { color: #e05d5d; }
+    .simple-card .checks { list-style: none; display: grid; gap: 5px; margin: 0; padding: 0; }
+    .simple-card .checks li {
+      display: grid; grid-template-columns: 18px 1fr; gap: 6px; align-items: baseline;
+      font-size: 12px; line-height: 1.35; color: #c5ced8;
+    }
+    .simple-card .checks li b { font-size: 12px; }
+    .simple-card .checks li.yes b { color: #2ee59a; }
+    .simple-card .checks li.no b { color: #e05d5d; }
+    .simple-card .do { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.35; }
+    .simple-card .nums {
+      display: flex; flex-wrap: wrap; gap: 8px 14px;
+      font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--muted);
+      border-top: 1px solid var(--stroke); padding-top: 10px;
+    }
+    .simple-card .nums span i { font-style: normal; color: var(--text); }
+    .simple-card .more { display: none; flex-direction: column; gap: 10px; }
+    .simple-card.open .more { display: flex; }
+    .simple-card .hint-tap {
+      font-size: 11px; color: var(--muted); letter-spacing: 0.04em;
+    }
+    .simple-card.open .hint-tap { display: none; }
+    .simple-card .tl-mini {
+      font-size: 12px; color: #c5ced8; line-height: 1.35;
+      padding: 8px 10px; border-radius: 10px; background: var(--bg-2);
+      box-shadow: inset 0 0 0 1px var(--stroke);
+    }
+    .simple-card .tl-mini b { font-weight: 700; }
+    .simple-card.buy .tl-mini b { color: #2ee59a; }
+    .simple-card.wait .tl-mini b { color: #e7a23a; }
+    .simple-card.sell .tl-mini b { color: #e05d5d; }
+    .simple-card.open .tl-mini { display: none; }
+    .simple-card.open .checks.top { display: none; }
+    .tl {
+      background: var(--bg-2); border-radius: 12px; padding: 10px 12px 8px;
+      box-shadow: inset 0 0 0 1px var(--stroke);
+    }
+    .tl-title {
+      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 8px; font-weight: 700;
+    }
+    .tl ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+    .tl li {
+      position: relative; padding: 0 0 10px 16px;
+      border-left: 2px solid var(--stroke);
+    }
+    .tl li:last-child { padding-bottom: 0; border-left-color: transparent; }
+    .tl li::before {
+      content: ""; position: absolute; left: -5px; top: 4px;
+      width: 8px; height: 8px; border-radius: 50%; background: var(--muted);
+      box-shadow: 0 0 0 2px var(--bg-2);
+    }
+    .tl li.buy::before { background: #2ee59a; }
+    .tl li.wait::before { background: #e7a23a; }
+    .tl li.sell::before { background: #e05d5d; }
+    .tl li.now { border-left-color: #3d5a73; }
+    .tl .mark {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+      font-size: 12px; font-weight: 700;
+    }
+    .tl .mark .lab.buy { color: #2ee59a; }
+    .tl .mark .lab.wait { color: #e7a23a; }
+    .tl .mark .lab.sell { color: #e05d5d; }
+    .tl .mark .dt { color: var(--muted); font-weight: 500; font-family: "IBM Plex Mono", monospace; font-size: 11px; }
+    .tl .pxrow { color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 11px; margin-top: 2px; }
+    .tl .edge {
+      margin: 2px 0 6px; font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 600;
+    }
+    .tl .edge.up { color: #2ee59a; }
+    .tl .edge.down { color: #e05d5d; }
+    .tl .edge.flat { color: var(--amber); }
+    .flip-banner {
+      background: var(--card); box-shadow: var(--shadow); border-radius: 12px;
+      padding: 12px 14px; margin: 0 0 14px; font-size: 13px; line-height: 1.45; color: #c5ced8;
+    }
+    .flip-banner b { color: var(--text); }
+    .flip-banner .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .flip-banner .pill {
+      font-family: "IBM Plex Mono", monospace; font-size: 11px;
+      padding: 4px 8px; border-radius: 999px; background: var(--bg-2);
+      box-shadow: inset 0 0 0 1px var(--stroke); cursor: pointer;
+    }
+    .flip-banner .pill:hover { box-shadow: inset 0 0 0 1px #3d5a73; }
     .mega-head { margin: 8px 0 22px; }
     .mega-head h2 { font-size: 22px; letter-spacing: -0.03em; font-weight: 700; }
     .mega-head p { color: var(--muted); font-size: 13px; margin-top: 6px; }
@@ -536,7 +667,8 @@
         <div class="kicker">Daily scan · simple moving averages</div>
         <h1>S&amp;P 500 <span>50 / 200 watch</span></h1>
         <div class="pager">
-          <button type="button" data-page="desk" class="on">Desk</button>
+          <button type="button" data-page="simple" class="on">Simple</button>
+          <button type="button" data-page="desk">Desk</button>
           <button type="button" data-page="tape">Full tape</button>
         </div>
       </div>
@@ -1799,7 +1931,10 @@
     }
 
     const MEGA_CAP = 750e9;
-    let page = "desk";
+    let page = "simple";
+    let simpleFilter = "ALL";
+    let simpleQuery = "";
+    let simpleOpen = null;
     let filter = "ALL";
     let hideEarnings = false;
     let live = false;
@@ -2113,8 +2248,478 @@
       render();
     }
 
+    function simpleChecks(d) {
+      const call = finalCall(d);
+      const lv = levels(d);
+      const b = bookOf(d);
+      const under = !!(d.line_kind === "ceiling" || (d.line_px && d.price < d.line_px * 0.995));
+      const through = !!(d.line_kind === "support" && d.line_px && d.price >= d.line_px * 0.995) || holdsTheLine(d);
+      const holding = through && !(d.line_kind === "support" && d.line_px && d.price < d.line_px * 0.98);
+      const pastOk = b.pays === true;
+      const pastBad = b.fails === true;
+      const pastThin = !pastOk && !pastBad;
+      const moneyOk = obvRank(d) !== "leave";
+      const cool = d.rsi == null || d.rsi < 75;
+      const noEarn = !earnSoon(d);
+      const death = d.signal === "DEATH_TODAY" || d.signal === "NEAR_DEATH";
+      const lineName = d.line_name || "line";
+      const linePx = lv.ok ? lv.entry : (d.line_px || d.sma50);
+      const stopPx = lv.ok ? lv.stop : (linePx ? linePx * 0.98 : null);
+      const other = d.line_name === "200" ? d.sma50 : d.sma200;
+      const targetPx = other && other > d.price * 1.003 ? other : d.price * 1.05;
+      const targetLabel = other && other > d.price * 1.003 ? "next line" : "+5%";
+
+      const checks = [
+        {
+          ok: !death,
+          text: death ? "Trend is breaking (short average losing long). Skip." : "Trend is not breaking."
+        },
+        {
+          ok: through && !under,
+          text: through && !under
+            ? "Price already closed through the line and is still above it."
+            : "Price is still under the line (first tap). Do not buy yet."
+        },
+        {
+          ok: holding,
+          text: holding
+            ? "Holding the line — has not closed 2% under it."
+            : "Lost the line, or never owned it."
+        },
+        {
+          ok: pastOk,
+          text: pastOk
+            ? "This stock’s past on this kind of setup paid."
+            : pastBad
+              ? "This stock’s past on this kind of setup lost more than it won."
+              : "Not enough past trades to trust — treat as wait."
+        },
+        {
+          ok: moneyOk,
+          text: moneyOk ? "Money flow is not leaving." : "Money is leaving — skip or size tiny."
+        },
+        {
+          ok: cool,
+          text: cool ? "Not overheated." : "Too hot right now — wait for a cooler pullback."
+        },
+        {
+          ok: noEarn,
+          text: noEarn ? "No earnings in the next few days." : "Earnings soon — wait for the report."
+        }
+      ];
+
+      let doThis;
+      if (call.flag === "BUY") {
+        doThis = "BUY a small size. Leave if a daily close loses $" + (stopPx ? stopPx.toFixed(2) : "the line") + ".";
+      } else if (call.flag === "SELL") {
+        doThis = "Do not own this. Wait for a daily close through $" + (linePx ? linePx.toFixed(2) : "the line") + ", then a hold.";
+      } else {
+        doThis = "WAIT. No buy until every red check is green.";
+      }
+
+      return {
+        call: call.flag,
+        checks,
+        line: linePx,
+        lineName,
+        stop: stopPx,
+        target: targetPx,
+        targetLabel,
+        doThis,
+        pastThin
+      };
+    }
+
+    const CALL_HIST_KEY = "finsense_call_hist_v1";
+
+    function barDay(data, all) {
+      const m = (data && data.market) || {};
+      const raw = m.bar_date || (all[0] && all[0].bar_date) || (data && data.generated_at) || "";
+      return String(raw).slice(0, 10);
+    }
+
+    function shortDay(iso) {
+      if (!iso) return "—";
+      const p = String(iso).slice(0, 10).split("-");
+      if (p.length < 3) return String(iso).slice(0, 10);
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const mi = (+p[1] || 1) - 1;
+      return months[mi] + " " + (+p[2]);
+    }
+
+    function flagWord(f) {
+      return f === "WATCH" ? "WAIT" : (f || "—");
+    }
+
+    function flagClass(f) {
+      const w = flagWord(f).toLowerCase();
+      return w === "buy" || w === "wait" || w === "sell" ? w : "wait";
+    }
+
+    function loadCallHist() {
+      try { return JSON.parse(localStorage.getItem(CALL_HIST_KEY) || "{}"); }
+      catch (e) { return {}; }
+    }
+
+    function saveCallHist(hist) {
+      try { localStorage.setItem(CALL_HIST_KEY, JSON.stringify(hist)); }
+      catch (e) {}
+    }
+
+    function recordCalls(all, data) {
+      if (!all || !all.length) return;
+      const day = barDay(data, all) || new Date().toISOString().slice(0, 10);
+      const hist = loadCallHist();
+      all.forEach(d => {
+        if (!d || !d.ticker || d.price == null) return;
+        const flag = finalCall(d).flag;
+        const price = +d.price;
+        const list = hist[d.ticker] || [];
+        const last = list[list.length - 1];
+        if (!last) {
+          // First mark — this status starts today
+          list.push({ date: day, flag, price, endDate: day });
+        } else if (last.flag !== flag) {
+          last.endDate = day;
+          list.push({
+            date: day,
+            flag,
+            price,
+            endDate: day,
+            from: last.flag,
+            fromPrice: last.price,
+            fromDate: last.date
+          });
+        } else {
+          // Same call — keep start date and start price; only refresh last-seen day
+          last.endDate = day;
+        }
+        hist[d.ticker] = list.slice(-40);
+      });
+      saveCallHist(hist);
+    }
+
+    function callTimeline(d) {
+      const list = loadCallHist()[d.ticker] || [];
+      if (!list.length) {
+        const flag = finalCall(d).flag;
+        return [{
+          date: barDay(window.SCAN_DATA, [d]) || new Date().toISOString().slice(0, 10),
+          endDate: null,
+          flag,
+          price: d.price,
+          pct: null,
+          now: true,
+          first: true
+        }];
+      }
+      const nodes = [];
+      for (let i = 0; i < list.length; i++) {
+        const e = list[i];
+        const prev = list[i - 1];
+        let pct = null;
+        if (prev && prev.price) pct = ((e.price / prev.price) - 1) * 100;
+        nodes.push({
+          date: e.date,
+          endDate: e.endDate || e.date,
+          flag: e.flag,
+          price: e.price,
+          pct,
+          now: i === list.length - 1,
+          first: i === 0 && !e.from
+        });
+      }
+      // Live tip: % from last status start price to current price
+      const tip = nodes[nodes.length - 1];
+      if (tip && tip.price && d.price) {
+        tip.livePct = ((d.price / tip.price) - 1) * 100;
+        tip.livePrice = d.price;
+      }
+      return nodes;
+    }
+
+    function callFlip(d) {
+      const list = loadCallHist()[d.ticker] || [];
+      for (let i = list.length - 1; i >= 0; i--) {
+        const e = list[i];
+        if (!e.from) continue;
+        const base = e.fromPrice;
+        const pct = base ? ((d.price / base) - 1) * 100 : null;
+        return {
+          from: flagWord(e.from),
+          to: flagWord(e.flag),
+          since: e.date,
+          fromDate: e.fromDate,
+          fromPrice: base,
+          pct,
+          steps: list.filter(x => x.from).length
+        };
+      }
+      return null;
+    }
+
+    function daysBetween(a, b) {
+      if (!a || !b) return 9999;
+      const t0 = Date.parse(a.slice(0, 10));
+      const t1 = Date.parse(b.slice(0, 10));
+      if (!isFinite(t0) || !isFinite(t1)) return 9999;
+      return Math.abs(t1 - t0) / 86400000;
+    }
+
+    function historicalFlips(all, withinDays) {
+      const out = [];
+      const today = new Date().toISOString().slice(0, 10);
+      (all || []).forEach(d => {
+        const list = loadCallHist()[d.ticker] || [];
+        list.forEach(e => {
+          if (!e.from) return;
+          if (withinDays != null && daysBetween(e.date, today) > withinDays) return;
+          const base = e.fromPrice;
+          const pct = base ? ((d.price / base) - 1) * 100 : null;
+          out.push({
+            ticker: d.ticker,
+            from: flagWord(e.from),
+            to: flagWord(e.flag),
+            since: e.date,
+            fromDate: e.fromDate,
+            pct,
+            price: d.price
+          });
+        });
+      });
+      out.sort((a, b) => String(b.since).localeCompare(String(a.since)));
+      return out;
+    }
+
+    function hasFlipHistory(d) {
+      const list = loadCallHist()[d.ticker] || [];
+      return list.some(e => e.from) || list.length >= 2;
+    }
+
+    function timelineHtml(d) {
+      const nodes = callTimeline(d);
+      const items = nodes.map((n, i) => {
+        const lab = flagWord(n.flag);
+        const cls = flagClass(n.flag);
+        const start = shortDay(n.date);
+        const end = n.now ? "now" : shortDay(n.endDate || n.date);
+        const range = n.first && nodes.length === 1
+          ? `since ${start}`
+          : (n.now ? `${start} → now` : `${start} → ${end}`);
+        let edge = "";
+        if (i > 0 && n.pct != null) {
+          const ecls = n.pct > 0.05 ? "up" : n.pct < -0.05 ? "down" : "flat";
+          const ep = (n.pct >= 0 ? "+" : "") + n.pct.toFixed(1) + "%";
+          edge = `<div class="edge ${ecls}">↓ ${ep} into this call</div>`;
+        }
+        const live = n.now && n.livePct != null
+          ? ` · now $${(+n.livePrice).toFixed(2)} (${(n.livePct >= 0 ? "+" : "") + n.livePct.toFixed(1)}% in this call)`
+          : "";
+        return `${edge}<li class="${cls}${n.now ? " now" : ""}">
+          <div class="mark"><span class="lab ${cls}">${lab}${n.now ? " · current" : ""}</span><span class="dt">${range}</span></div>
+          <div class="pxrow">@ $${(+n.price).toFixed(2)} when marked${live}</div>
+        </li>`;
+      }).join("");
+      return `<div class="tl"><div class="tl-title">Call timeline</div><ol>${items}</ol></div>`;
+    }
+
+    function topChecks(checks) {
+      // Red fails first (worth mentioning), then the two setup facts
+      const fails = checks.filter(c => !c.ok);
+      const passes = checks.filter(c => c.ok);
+      const picked = fails.concat(passes).slice(0, 2);
+      return picked;
+    }
+
+    function timelineMini(d) {
+      const nodes = callTimeline(d);
+      const tip = nodes[nodes.length - 1];
+      if (!tip) return "";
+      const lab = flagWord(tip.flag);
+      const when = tip.first && nodes.length === 1
+        ? "since " + shortDay(tip.date)
+        : shortDay(tip.date) + " → now";
+      const live = tip.livePct == null
+        ? ""
+        : " · " + (tip.livePct >= 0 ? "+" : "") + tip.livePct.toFixed(1) + "% in this call";
+      const flip = nodes.length > 1
+        ? " · " + (nodes.length - 1) + " earlier mark" + (nodes.length > 2 ? "s" : "")
+        : "";
+      return `<div class="tl-mini"><b>${lab}</b> ${when}${live}${flip}</div>`;
+    }
+
+    function checkItems(list) {
+      return list.map(c =>
+        `<li class="${c.ok ? "yes" : "no"}"><b>${c.ok ? "✓" : "✗"}</b><span>${c.text}</span></li>`
+      ).join("");
+    }
+
+    function renderSimple(data, all) {
+      const grid = document.getElementById("grid");
+      const meta = document.getElementById("meta");
+      if (!data || !all || !all.length) {
+        meta.textContent = "Simple checks";
+        grid.innerHTML = `<div class="simple-head"><h2>Simple</h2><p>One call. A few yes/no checks. No jargon.</p></div><div class="empty">No scan yet. Hit <strong>Scan live data</strong>.</div>`;
+        return;
+      }
+      recordCalls(all, data);
+      const day = barDay(data, all);
+      const flipsHist = historicalFlips(all, 90);
+      const flipsToday = flipsHist.filter(f => f.since === day);
+      const q = (simpleQuery || "").trim().toLowerCase();
+      let rows = all.slice();
+      if (q) {
+        rows = rows.filter(r =>
+          (r.ticker || "").toLowerCase().includes(q) ||
+          (r.name || "").toLowerCase().includes(q)
+        );
+      } else if (simpleFilter === "BUY") {
+        rows = rows.filter(r => finalCall(r).flag === "BUY");
+      } else if (simpleFilter === "WAIT") {
+        rows = rows.filter(r => finalCall(r).flag === "WATCH");
+      } else if (simpleFilter === "SELL") {
+        rows = rows.filter(r => finalCall(r).flag === "SELL");
+      } else if (simpleFilter === "FLIP") {
+        rows = rows.filter(hasFlipHistory);
+        if (!rows.length) {
+          // Nothing flipped yet — show focus set with timelines so the tab is never empty
+          const buys = all.filter(r => finalCall(r).flag === "BUY");
+          const mega = all.filter(isMega);
+          const seen = {};
+          rows = [];
+          buys.concat(mega).forEach(r => {
+            if (seen[r.ticker]) return;
+            seen[r.ticker] = 1;
+            rows.push(r);
+          });
+        }
+      } else if (simpleFilter === "MEGA") {
+        rows = rows.filter(isMega);
+      } else {
+        const buys = rows.filter(r => finalCall(r).flag === "BUY");
+        const mega = rows.filter(isMega);
+        const flipped = rows.filter(hasFlipHistory);
+        const seen = {};
+        rows = [];
+        buys.concat(flipped).concat(mega).forEach(r => {
+          if (seen[r.ticker]) return;
+          seen[r.ticker] = 1;
+          rows.push(r);
+        });
+      }
+      const rank = { BUY: 2, WATCH: 1, WAIT: 1, SELL: 0 };
+      rows.sort((a, b) => {
+        const aFlip = hasFlipHistory(a) ? 1 : 0;
+        const bFlip = hasFlipHistory(b) ? 1 : 0;
+        if (simpleFilter === "FLIP" && aFlip !== bFlip) return bFlip - aFlip;
+        const fa = callFlip(a);
+        const fb = callFlip(b);
+        const aToday = fa && fa.since === day ? 1 : 0;
+        const bToday = fb && fb.since === day ? 1 : 0;
+        if (aToday !== bToday) return bToday - aToday;
+        const da = rank[finalCall(a).flag] || 0;
+        const db = rank[finalCall(b).flag] || 0;
+        if (da !== db) return db - da;
+        return (b.market_cap || 0) - (a.market_cap || 0);
+      });
+      meta.innerHTML = `${rows.length} names · simple checks`;
+      const flipCount = flipsHist.length;
+      const chips = [
+        ["ALL", "Focus"],
+        ["FLIP", "Flips"],
+        ["BUY", "Buy"],
+        ["WAIT", "Wait"],
+        ["SELL", "Sell"],
+        ["MEGA", "$750B+"]
+      ].map(([k, lab]) =>
+        `<button type="button" class="chip ${simpleFilter === k ? "on" : ""}" data-sf="${k}">${lab}${k === "FLIP" && flipCount ? " (" + flipCount + ")" : ""}</button>`
+      ).join("");
+      let banner;
+      if (flipsHist.length) {
+        banner = `<div class="flip-banner"><b>Call flips (last 90 days).</b> Past mark → new mark, with % from the old mark’s price to now. Click a pill to open that tile.
+          <div class="row">${flipsHist.slice(0, 16).map(f => {
+            const pct = f.pct == null ? "—" : ((f.pct >= 0 ? "+" : "") + f.pct.toFixed(1) + "%");
+            return `<span class="pill" data-goto="${f.ticker}">${f.ticker} ${f.from}→${f.to} ${shortDay(f.since)} ${pct}</span>`;
+          }).join("")}</div></div>`;
+      } else {
+        banner = `<div class="flip-banner"><b>Timeline started today (${shortDay(day)}).</b> Each tile already shows the current call with a start date. When a call changes later (BUY → SELL), that flip and the % between marks appear here and on the tile timeline. History is stored in this browser.</div>`;
+      }
+      const cards = rows.slice(0, 40).map(d => {
+        const s = simpleChecks(d);
+        const side = s.call === "WATCH" ? "WAIT" : s.call;
+        const top = topChecks(s.checks);
+        const open = simpleOpen === d.ticker;
+        return `<article class="simple-card ${side.toLowerCase()}${open ? " open" : ""}" data-ticker="${d.ticker}">
+          <div class="who">
+            <span class="tk">${d.ticker}</span>
+            <span class="side">${side}</span>
+          </div>
+          <div class="px">$${d.price.toFixed(2)}${d.market_cap ? " · " + fmtCap(d.market_cap) : ""}</div>
+          ${timelineMini(d)}
+          <ul class="checks top">${checkItems(top)}</ul>
+          <div class="do">${s.doThis}</div>
+          <div class="hint-tap">Tap to expand</div>
+          <div class="more">
+            ${timelineHtml(d)}
+            <ul class="checks">${checkItems(s.checks)}</ul>
+            <div class="nums">
+              <span>Line <i>$${s.line == null ? "—" : s.line.toFixed(2)}</i></span>
+              <span>Stop <i>$${s.stop == null ? "—" : s.stop.toFixed(2)}</i></span>
+              <span>Aim <i>$${s.target == null ? "—" : s.target.toFixed(2)}</i></span>
+            </div>
+          </div>
+        </article>`;
+      }).join("");
+      grid.innerHTML = `<div class="simple-head">
+          <h2>Simple</h2>
+          <p>Two points that matter. Tap a tile for the full timeline and all checks.</p>
+        </div>
+        ${banner}
+        <div class="simple-tools">
+          <input id="simpleSearch" type="search" placeholder="Type a ticker — TSLA, NVDA…" value="${(simpleQuery || "").replace(/"/g, "&quot;")}" autocomplete="off" />
+          ${chips}
+        </div>
+        <div class="simple-list">${cards || `<div class="empty">Nothing in this filter. Try Focus or search a ticker.</div>`}</div>`;
+      const search = grid.querySelector("#simpleSearch");
+      if (search) {
+        search.oninput = () => {
+          simpleQuery = search.value;
+          render();
+          const again = document.querySelector("#simpleSearch");
+          if (again) {
+            again.focus();
+            try { again.setSelectionRange(again.value.length, again.value.length); } catch (e) {}
+          }
+        };
+      }
+      grid.querySelectorAll("[data-sf]").forEach(btn => {
+        btn.onclick = () => {
+          simpleFilter = btn.dataset.sf;
+          simpleQuery = "";
+          render();
+        };
+      });
+      grid.querySelectorAll("[data-goto]").forEach(el => {
+        el.onclick = ev => {
+          ev.stopPropagation();
+          simpleQuery = el.dataset.goto;
+          simpleFilter = "ALL";
+          simpleOpen = el.dataset.goto;
+          render();
+        };
+      });
+      grid.querySelectorAll(".simple-card").forEach(card => {
+        card.onclick = () => {
+          const t = card.dataset.ticker;
+          simpleOpen = simpleOpen === t ? null : t;
+          render();
+        };
+      });
+    }
+
     function render() {
       document.body.classList.toggle("on-desk", page === "desk");
+      document.body.classList.toggle("on-simple", page === "simple");
       document.querySelectorAll(".pager [data-page]").forEach(b => {
         b.classList.toggle("on", b.dataset.page === page);
       });
@@ -2123,6 +2728,12 @@
       const stats = document.getElementById("stats");
       const tabs = document.getElementById("tabs");
       const meta = document.getElementById("meta");
+
+      if (page === "simple") {
+        const all = data && (data.hits || data.all) ? universe(data) : [];
+        renderSimple(data, all);
+        return;
+      }
 
       if (page === "desk") {
         const all = data && (data.hits || data.all) ? universe(data) : [];
