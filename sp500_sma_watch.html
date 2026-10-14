@@ -223,39 +223,39 @@
     .simple-card.open .tl-mini { display: none; }
     .simple-card.open .checks.top { display: none; }
     .tl {
-      background: var(--bg-2); border-radius: 12px; padding: 10px 12px 8px;
+      background: var(--bg-2); border-radius: 12px; padding: 10px 12px;
       box-shadow: inset 0 0 0 1px var(--stroke);
     }
     .tl-title {
       font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--muted); margin-bottom: 8px; font-weight: 700;
     }
-    .tl ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+    .tl ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
     .tl li {
-      position: relative; padding: 0 0 10px 16px;
+      position: relative; padding: 0 0 0 14px;
       border-left: 2px solid var(--stroke);
     }
-    .tl li:last-child { padding-bottom: 0; border-left-color: transparent; }
+    .tl li:last-child { border-left-color: transparent; }
     .tl li::before {
-      content: ""; position: absolute; left: -5px; top: 4px;
+      content: ""; position: absolute; left: -5px; top: 5px;
       width: 8px; height: 8px; border-radius: 50%; background: var(--muted);
       box-shadow: 0 0 0 2px var(--bg-2);
     }
     .tl li.buy::before { background: #2ee59a; }
     .tl li.wait::before { background: #e7a23a; }
     .tl li.sell::before { background: #e05d5d; }
-    .tl li.now { border-left-color: #3d5a73; }
-    .tl .mark {
-      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
-      font-size: 12px; font-weight: 700;
+    .tl .lab { font-size: 13px; font-weight: 700; display: block; }
+    .tl .lab.buy { color: #2ee59a; }
+    .tl .lab.wait { color: #e7a23a; }
+    .tl .lab.sell { color: #e05d5d; }
+    .tl .dt,
+    .tl .pxrow {
+      display: block; margin-top: 3px;
+      color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 11px;
+      line-height: 1.4; white-space: normal; word-break: break-word;
     }
-    .tl .mark .lab.buy { color: #2ee59a; }
-    .tl .mark .lab.wait { color: #e7a23a; }
-    .tl .mark .lab.sell { color: #e05d5d; }
-    .tl .mark .dt { color: var(--muted); font-weight: 500; font-family: "IBM Plex Mono", monospace; font-size: 11px; }
-    .tl .pxrow { color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 11px; margin-top: 2px; }
     .tl .edge {
-      margin: 2px 0 6px; font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 600;
+      margin: 0 0 4px; font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 600;
     }
     .tl .edge.up { color: #2ee59a; }
     .tl .edge.down { color: #e05d5d; }
@@ -664,7 +664,7 @@
   <div class="wrap">
     <header>
       <div>
-        <div class="kicker">Daily scan · simple moving averages</div>
+        <div class="kicker">Daily scan · statistical model estimate · not financial advice</div>
         <h1>S&amp;P 500 <span>50 / 200 watch</span></h1>
         <div class="pager">
           <button type="button" data-page="simple" class="on">Simple</button>
@@ -1001,7 +1001,7 @@
       <div class="thoughts" id="thoughts"></div>
     </details>
     <section class="grid" id="grid"></section>
-    <p class="note">Screening aid only — not a buy list. Open hits in IBKR on a daily chart. A golden cross is a trend label, not an entry. Prefer pullbacks toward the 50 after a cross, with RSI not stuck above 70.</p>
+    <p class="note">Statistical model estimates only — not financial advice or a recommendation to buy or sell any security. Past win rates and 3m/6m path rates do not guarantee future results. Always verify levels on your own chart.</p>
     </div>
     </div>
   </div>
@@ -1185,9 +1185,41 @@
         return !!(support && d.price >= support.px);
       }
       if (tag === "RIZZ" || tag === "GROWTH") {
-        return !!(d.sma50 && d.price >= d.sma50 * 0.995);
+        return !!(d.sma50 && d.price >= d.sma50);
       }
       return false;
+    }
+
+    function dayChangePct(d) {
+      if (d.day_chg_pct != null) return +d.day_chg_pct;
+      const sp = d.spark || [];
+      if (sp.length < 2 || !sp[sp.length - 2]) return 0;
+      return ((sp[sp.length - 1] / sp[sp.length - 2]) - 1) * 100;
+    }
+
+    function isStabilized(d) {
+      return dayChangePct(d) >= -0.75;
+    }
+
+    function activeLine(d) {
+      const tag = action(d).tag;
+      const { resist, support } = bands(d);
+      if ((tag === "TEST" || tag === "AVOID") && resist) {
+        return { name: resist.name, px: resist.px, kind: "ceiling" };
+      }
+      if (d.line_px != null && d.line_kind && !(tag === "TEST" && d.line_kind === "support")) {
+        return { name: d.line_name || "line", px: d.line_px, kind: d.line_kind };
+      }
+      if (support) return { name: support.name, px: support.px, kind: "support" };
+      if (resist) return { name: resist.name, px: resist.px, kind: "ceiling" };
+      if (d.sma50) return { name: "50", px: d.sma50, kind: d.price >= d.sma50 ? "support" : "ceiling" };
+      return { name: "line", px: null, kind: null };
+    }
+
+    function stretchAboveSupportPct(d) {
+      const al = activeLine(d);
+      if (!al.px || al.kind !== "support") return null;
+      return ((d.price - al.px) / al.px) * 100;
     }
 
     function isBuyPack(d) {
@@ -1196,8 +1228,12 @@
       const tag = action(d).tag;
       if (tag !== "GAME ON" && tag !== "RIZZ" && tag !== "GROWTH") return false;
       if (dipCheck(d).verdict !== "buy") return false;
-      if (obvRank(d) !== "best") return false;
+      if (obvRank(d) === "leave") return false;
       if (!holdsTheLine(d)) return false;
+      const str = stretchAboveSupportPct(d);
+      if (str == null || str < 0 || str > 2.0) return false;
+      if (!isStabilized(d)) return false;
+      if ((d.line_run || 0) < 2) return false;
       if (d.rsi != null && (d.rsi >= 68 || d.rsi < 35)) return false;
       return true;
     }
@@ -1478,14 +1514,10 @@
     }
 
     function fillLevels(d, px) {
-      const { resist, support } = bands(d);
-      const picked = (d.line_px != null)
-        ? { name: d.line_name || "line", px: d.line_px, ceiling: d.line_kind === "ceiling" }
-        : support
-          ? { name: support.name, px: support.px, ceiling: false }
-          : resist
-            ? { name: resist.name, px: resist.px, ceiling: true }
-            : (d.sma50 ? { name: "50", px: d.sma50, ceiling: px < d.sma50 } : null);
+      const al = activeLine(d);
+      const picked = al.px != null
+        ? { name: al.name || "line", px: al.px, ceiling: al.kind === "ceiling" }
+        : null;
       if (!picked || !picked.px) {
         return { ok: false, plan: "No 50 or 200 on this name yet." };
       }
@@ -1690,7 +1722,7 @@
 
     function bookOf(d) {
       const tag = action(d).tag;
-      const book = (tag === "RIZZ" ? d.dip_book : d.held_book) || d.held_book || d.dip_book || {};
+      const book = ((tag === "RIZZ" || tag === "GROWTH") ? d.dip_book : d.held_book) || d.held_book || d.dip_book || {};
       const wr = book.win_rate_closed;
       const n = (book.wins || 0) + (book.losses || 0) || book.entries || 0;
       const hit5 = book.hit5_3m_rate;
@@ -1699,84 +1731,110 @@
       const hit106 = book.hit10_6m_rate;
       const n3 = book.ready_3m || 0;
       const n6 = book.ready_6m || 0;
-      const pool = ((((window.SCAN_DATA || {}).method_test || {}).held || {}).win_rate_closed);
-      const tradePays = n >= 10 && wr != null && (wr >= 52 || (pool != null && wr >= pool + 8));
-      const climbPays = (n3 >= 10 && hit5 != null && hit5 >= 55) || (n6 >= 10 && hit56 != null && hit56 >= 65);
+      const poolObj = (window.SCAN_DATA || {}).method_test || {};
+      const pool = ((tag === "RIZZ" || tag === "GROWTH") ? (poolObj.dip || {}) : (poolObj.held || {})).win_rate_closed;
+      const tradePays = n >= 10 && wr != null && (wr >= 50 || (pool != null && wr >= pool + 6));
+      const climbPays = n >= 10 && (wr == null || wr >= 42) && ((n3 >= 10 && hit5 != null && hit5 >= 65) || (n6 >= 10 && hit56 != null && hit56 >= 75));
       const tradeFails = n >= 10 && wr != null && wr < 40;
-      const climbFails = n3 >= 10 && hit5 != null && hit5 < 40;
+      const climbFails = n3 >= 10 && hit5 != null && hit5 < 45;
       return {
         book, wr, n, hit5, hit10, hit56, hit106, n3, n6,
-        pays: tradePays || climbPays,
-        fails: tradeFails && (climbFails || hit5 == null),
+        pays: !tradeFails && (tradePays || climbPays),
+        fails: tradeFails || (climbFails && !tradePays),
         tradePays, climbPays
       };
     }
 
     function takeRead(d) {
       const tag = action(d).tag;
-      const sittingOn = nearFifty(d) ? "50" : nearTwoHundred(d) ? "200" : (d.line_name || null);
+      const al = activeLine(d);
+      const sittingOn = al.name || (nearFifty(d) ? "50" : nearTwoHundred(d) ? "200" : (d.line_name || null));
       const stair = sittingOn === "200" ? (d.touch_200 || {}) : (d.touch_50 || {});
       const b = bookOf(d);
       const inSetup = tag === "GAME ON" || tag === "RIZZ" || tag === "GROWTH";
-      const holding = !!(d.line_kind === "support" && d.line_px && d.price >= d.line_px * 0.995) || holdsTheLine(d);
-      const lostLine = !!(d.line_kind === "support" && d.line_px && d.price < d.line_px * 0.98);
+      const holding = !!(al.kind === "support" && al.px && d.price >= al.px);
+      const stretchPct = stretchAboveSupportPct(d);
+      const earlyZone = stretchPct != null && stretchPct >= 0 && stretchPct <= 2.0;
+      const confirmed = (d.line_run || 0) >= 2;
+      const stabilized = isStabilized(d);
+      const dayChg = dayChangePct(d);
+      const moneyOk = obvRank(d) !== "leave";
+      const dipBuy = (d.dip_verdict || "") === "buy";
       const dipLeave = (d.dip_verdict || "") === "leave";
-      const hot = d.rsi != null && d.rsi >= 75;
+      const lostLine = !!(al.kind === "support" && al.px && d.price < al.px * 0.98);
+      const hot = d.rsi != null && d.rsi >= 68;
+      const washed = d.rsi != null && d.rsi < 35;
+      const stairTrap = stair.decision === "leave";
+
       let flag = "WATCH";
-      let why = "Wait. Need a live hold of the line, or a name that actually pays this setup.";
+      let why = "Estimate: WAIT. Need a confirmed hold near support, steady price, and a history that pays.";
       let tone = "holdup";
+
       if (d.signal === "DEATH_TODAY" || d.signal === "NEAR_DEATH") {
-        flag = "SELL"; why = "50 is losing the 200. Do not own this."; tone = "skip";
+        flag = "SELL"; why = "Estimate: SELL / AVOID. 50 is losing the 200 (trend breaking)."; tone = "skip";
       } else if (lostLine || tag === "AVOID") {
-        flag = "SELL"; why = tag === "AVOID" ? "Below both lines. Do not own this." : "Price already lost the line. Leave."; tone = "skip";
-      } else if (stair.decision === "leave" && (tag === "TEST" || tag === "AVOID" || !holding)) {
-        flag = "SELL"; why = "This line has been a trap from here. Do not own the poke."; tone = "skip";
-      } else if (stair.decision === "leave") {
-        flag = "WATCH"; why = "This line rejects from this side. Hold what you have — do not add."; tone = "holdup";
+        flag = "SELL"; why = tag === "AVOID" ? "Estimate: SELL / AVOID. Below both lines." : "Estimate: SELL. Price lost the support line."; tone = "skip";
+      } else if (stairTrap && (tag === "TEST" || tag === "AVOID" || !holding)) {
+        flag = "SELL"; why = "Estimate: SELL / AVOID. This line has repeatedly rejected or broken here."; tone = "skip";
       } else if (inSetup && b.fails) {
-        flag = "SELL"; why = "This name loses this trade. Green checks do not matter. Do not own it."; tone = "skip";
+        flag = "SELL"; why = "Estimate: SELL / SKIP. This stock’s past setups on this line lost too often (" + (b.wr != null ? b.wr + "%" : "weak") + ")."; tone = "skip";
       } else if (tag === "TEST") {
-        flag = "WATCH"; why = "First tap. Wait for a daily close through the line."; tone = "holdup";
-      } else if (inSetup && holding && !dipLeave && !hot && b.pays && earnSoon(d)) {
-        flag = "WATCH"; why = "This name pays, but earnings are soon. Wait for the print."; tone = "holdup";
-      } else if (inSetup && holding && !dipLeave && !hot && b.pays) {
-        flag = "BUY";
-        why = b.tradePays
-          ? "BUY. This name has paid the trade. Confirm the last bar on IBKR. Leave if a daily close loses the line."
-          : "BUY. This name usually climbs from here. Confirm the last bar on IBKR. Leave if a daily close loses the line.";
-        tone = "go";
-      } else if (inSetup && holding && !dipLeave && !hot && b.n < 10) {
-        flag = "WATCH"; why = "Setup is live, but the history is thin. If you take it, size small."; tone = "holdup";
-      } else if (inSetup && holding && d.pack === "BUY" && !b.fails) {
-        flag = "WATCH"; why = "Today is clean, but this name is only a coin flip. Size small or skip."; tone = "holdup";
+        flag = "WATCH"; why = "Estimate: WAIT. Price is still under the " + (al.name || "line") + " ceiling — wait for 2 closes above it."; tone = "holdup";
+      } else if (tag === "HOLD" || tag === "CLEAR" || tag === "RANGE") {
+        flag = "WATCH";
+        why = tag === "HOLD"
+          ? "Estimate: WAIT. Uptrend is extended at highs — wait for a pullback to the 50."
+          : tag === "CLEAR"
+            ? "Estimate: WAIT. Above both lines — wait for a pullback that holds support."
+            : "Estimate: WAIT. Stuck between the 50 and 200 — wait for a clean hold or break.";
+        tone = "holdup";
+      } else if (inSetup && holding) {
+        if (dipLeave) {
+          flag = "WATCH"; why = "Estimate: WAIT. Pullback quality is weak (volume/RSI/OBV)."; tone = "holdup";
+        } else if (!moneyOk) {
+          flag = "WATCH"; why = "Estimate: WAIT. Money flow (OBV) is leaving — do not buy while volume is exiting."; tone = "holdup";
+        } else if (!confirmed) {
+          flag = "WATCH"; why = "Estimate: WAIT. Only 1 close above the " + (al.name || "line") + " — need at least 2 closes to avoid head-fakes."; tone = "holdup";
+        } else if (!stabilized) {
+          flag = "WATCH"; why = "Estimate: WAIT. Down " + Math.abs(dayChg).toFixed(1) + "% today into the line — wait for a steady or green close so you don’t catch a falling knife."; tone = "holdup";
+        } else if (!earlyZone) {
+          flag = "WATCH"; why = "Estimate: WAIT. Already +" + (stretchPct != null ? stretchPct.toFixed(1) : "2+") + "% above the " + (al.name || "line") + " — don’t buy highs, wait for a closer retest (0–2%)."; tone = "holdup";
+        } else if (hot || washed) {
+          flag = "WATCH"; why = hot ? "Estimate: WAIT. RSI is already hot (≥68) — wait to cool." : "Estimate: WAIT. RSI is washed out (<35) — wait to stabilize."; tone = "holdup";
+        } else if (stairTrap) {
+          flag = "WATCH"; why = "Estimate: WAIT. 3-year stair record on this line is weak — hold only, do not add."; tone = "holdup";
+        } else if (!dipBuy) {
+          flag = "WATCH"; why = "Estimate: WAIT. Dip score is mixed — wait for a cleaner bar on the line."; tone = "holdup";
+        } else if (!b.pays) {
+          flag = "WATCH"; why = b.n < 10 ? "Estimate: WAIT. Early setup is clean, but fewer than 10 past trades on this name." : "Estimate: WAIT. Setup is on the line, but past win rate is only a coin flip."; tone = "holdup";
+        } else if (earnSoon(d)) {
+          flag = "WATCH"; why = "Estimate: WAIT. Setup and history pass, but earnings are within days."; tone = "holdup";
+        } else {
+          flag = "BUY";
+          why = "Estimate: EARLY BUY. Sitting +" + stretchPct.toFixed(1) + "% on the " + (al.name || "line") + " (" + d.line_run + " closes), price steady today, money holding, and past setups paid. Statistical estimate only — not financial advice.";
+          tone = "go";
+        }
       }
 
       const pts = [];
       if (flag === "BUY") {
-        pts.push(sittingOn === "50" && d.sma200 && d.price < d.sma200
-          ? "Setup is live on the 50. First target is the 200 — take the walk, do not wait for a moonshot."
-          : "Setup is live. Price is holding the " + (sittingOn || d.line_name || "line") + ".");
-        if (b.tradePays) pts.push("This name has paid this trade (" + b.wr + "% of " + b.n + "). That is why this is a BUY.");
-        else if (b.climbPays && b.hit5 != null) pts.push("The tight target is mixed, but from here it climbs +5% in 3 months " + b.hit5 + "% of the time. That is why this is a BUY.");
-        else pts.push("The book supports a buy on this name.");
-        pts.push("Buy a small size. Stop is a daily close under the line. Confirm the last bar on IBKR.");
+        pts.push("Early entry zone: price is +" + stretchPct.toFixed(1) + "% above the " + (al.name || "line") + " with " + d.line_run + " confirmed closes and a steady close today (" + (dayChg >= 0 ? "+" : "") + dayChg.toFixed(1) + "%).");
+        if (b.tradePays) pts.push("Historical estimate: this stock won " + b.wr + "% of " + b.n + " resolved setups on this method.");
+        else if (b.climbPays && b.hit5 != null) pts.push("Historical estimate: win rate is " + b.wr + "% (" + b.n + " trades) and it reached +5% within 3 months " + b.hit5 + "% of the time.");
+        pts.push("Risk guide: stop estimate is $" + (al.px ? (al.px * 0.98).toFixed(2) : "—") + " (2% below the line). Model estimate only — not financial advice.");
       } else if (flag === "SELL") {
-        if (tag === "TEST" || tag === "AVOID") pts.push("Price is still under the line. This is not a buy.");
-        else if (sittingOn === "50" && d.sma200 && d.price < d.sma200) pts.push("Sitting on the 50, but this name does not pay the walk.");
+        if (tag === "TEST" || tag === "AVOID") pts.push("Price ($" + d.price.toFixed(2) + ") is below the " + (al.name || "line") + " ceiling ($" + (al.px ? al.px.toFixed(2) : "—") + "). Never buy from underneath.");
         else pts.push(why);
-        if (b.fails && b.wr != null) pts.push("This name’s own history loses this trade (" + b.wr + "% of " + b.n + "). Green boxes are about today, not about this stock paying.");
-        else if (stair.decision === "leave") pts.push("From this side the line has been a trap.");
-        if (b.n3 >= 8 && b.hit5 != null && b.hit5 < 45) pts.push("In 3 months it usually does not even climb 5%.");
-        else if (b.n3 >= 8 && b.hit10 != null && b.hit10 < 10) pts.push("A 10% climb almost never happens here.");
+        if (b.fails && b.wr != null) pts.push("Past setups on this stock lost " + (100 - b.wr).toFixed(1) + "% of the time (" + b.wr + "% win rate over " + b.n + " trades).");
+        else if (stairTrap) pts.push("3-year stair history shows this line usually breaks or rejects here.");
+        pts.push("Statistical estimate only — not financial advice.");
       } else {
-        if (tag === "TEST") pts.push("Price is still under the line. A first tap is not a buy.");
-        else if (sittingOn === "50" && d.sma200 && d.price < d.sma200) pts.push("Sitting on the 50. The next job is a walk to the 200 — only buy if this name actually pays that walk.");
-        else if (sittingOn) pts.push("Price is on the " + sittingOn + ". Wait for a cleaner hold or a name that pays.");
+        if (tag === "TEST") pts.push("Testing the " + (al.name || "line") + " ($" + (al.px ? al.px.toFixed(2) : "—") + ") from below. Wait for 2 daily closes above it.");
+        else if (inSetup && holding) pts.push(why);
         else pts.push(action(d).why);
-        if (b.n >= 10 && b.wr != null && b.wr >= 45 && b.wr < 55) pts.push("This name is a coin flip on the tight trade (" + b.wr + "% of " + b.n + ").");
-        else if (b.n < 10) pts.push("Not enough finished trades to trust a percent here.");
-        if (earnSoon(d)) pts.push("Earnings soon. A gap can skip your stop overnight.");
-        else if (b.climbPays) pts.push("The climb is there if you can wait — but today’s setup is not clean enough to buy yet.");
+        if (b.n >= 10 && b.wr != null) pts.push("Past trade win rate on this stock: " + b.wr + "% across " + b.n + " setups" + (b.hit5 != null ? " (+5% in 3m: " + b.hit5 + "%)." : "."));
+        else pts.push("Fewer than 10 past trades on this stock — history estimate is thin.");
+        pts.push("Wait for all early-entry checks to align. Estimate only — not financial advice.");
       }
       return { pts: pts.slice(0, 3), rec: why, tone, flag, why };
     }
@@ -2232,7 +2290,7 @@
           <div class="path6">${deskPathLine(d, side)}</div>
         </article>`;
       }).join("");
-      grid.innerHTML = `<div class="mega-head"><h2>The desk</h2><p>Only names over $750B. Buy, wait, or sell. One reason. Six months is the typical print — not a promise, and not a reason to own a name you already sold.</p></div><div class="mega-grid">${cards}</div>`;
+      grid.innerHTML = `<div class="mega-head"><h2>The desk</h2><p>Only names over $750B. Early-entry model estimate (BUY / WAIT / SELL), one reason, and the typical 6-month historical range. Statistical estimates only — not financial advice.</p></div><div class="mega-grid">${cards}</div>`;
       grid.querySelectorAll(".mega").forEach(el => {
         el.onclick = () => {
           selected = el.dataset.ticker;
@@ -2252,69 +2310,85 @@
       const call = finalCall(d);
       const lv = levels(d);
       const b = bookOf(d);
-      const under = !!(d.line_kind === "ceiling" || (d.line_px && d.price < d.line_px * 0.995));
-      const through = !!(d.line_kind === "support" && d.line_px && d.price >= d.line_px * 0.995) || holdsTheLine(d);
-      const holding = through && !(d.line_kind === "support" && d.line_px && d.price < d.line_px * 0.98);
+      const tag = action(d).tag;
+      const al = activeLine(d);
+      const lineName = al.name || d.line_name || "line";
+      const linePx = al.px != null ? al.px : (lv.ok ? lv.entry : (d.line_px || d.sma50));
+      const under = al.kind === "ceiling" || tag === "TEST" || tag === "AVOID" || (linePx != null && d.price < linePx);
+      const through = al.kind === "support" && !under && linePx != null && d.price >= linePx;
+      const confirmed = through && (d.line_run || 0) >= 2;
+      const stretchPct = stretchAboveSupportPct(d);
+      const earlyZone = through && stretchPct != null && stretchPct >= 0 && stretchPct <= 2.0;
+      const stabilized = isStabilized(d);
+      const dayChg = dayChangePct(d);
       const pastOk = b.pays === true;
       const pastBad = b.fails === true;
       const pastThin = !pastOk && !pastBad;
       const moneyOk = obvRank(d) !== "leave";
-      const cool = d.rsi == null || d.rsi < 75;
+      const cool = d.rsi == null || (d.rsi >= 35 && d.rsi < 68);
       const noEarn = !earnSoon(d);
       const death = d.signal === "DEATH_TODAY" || d.signal === "NEAR_DEATH";
-      const lineName = d.line_name || "line";
-      const linePx = lv.ok ? lv.entry : (d.line_px || d.sma50);
-      const stopPx = lv.ok ? lv.stop : (linePx ? linePx * 0.98 : null);
-      const other = d.line_name === "200" ? d.sma50 : d.sma200;
+      const stopPx = linePx ? (al.kind === "support" ? linePx * 0.98 : Math.min(linePx, d.price) * 0.98) : null;
+      const other = lineName === "200" ? d.sma50 : d.sma200;
       const targetPx = other && other > d.price * 1.003 ? other : d.price * 1.05;
       const targetLabel = other && other > d.price * 1.003 ? "next line" : "+5%";
 
       const checks = [
         {
           ok: !death,
-          text: death ? "Trend is breaking (short average losing long). Skip." : "Trend is not breaking."
+          text: death ? "Trend is breaking (50 losing 200). Skip." : "Trend is not breaking."
         },
         {
-          ok: through && !under,
-          text: through && !under
-            ? "Price already closed through the line and is still above it."
-            : "Price is still under the line (first tap). Do not buy yet."
+          ok: through,
+          text: through
+            ? "Above the " + lineName + " line ($" + linePx.toFixed(2) + ") as support."
+            : "Below the " + lineName + " ceiling ($" + (linePx ? linePx.toFixed(2) : "—") + ") — wait for a close through."
         },
         {
-          ok: holding,
-          text: holding
-            ? "Holding the line — has not closed 2% under it."
-            : "Lost the line, or never owned it."
+          ok: confirmed && earlyZone,
+          text: !through
+            ? "Not holding support yet."
+            : !confirmed
+              ? "Only 1 close above the " + lineName + " — wait for 2 closes."
+              : earlyZone
+                ? "Early entry zone (+" + stretchPct.toFixed(1) + "% above the " + lineName + ", not stretched at highs)."
+                : "Stretched +" + (stretchPct != null ? stretchPct.toFixed(1) : "2+") + "% above the " + lineName + " — wait for a pullback to 0–2%."
+        },
+        {
+          ok: stabilized,
+          text: stabilized
+            ? "Price stabilized today (" + (dayChg >= 0 ? "+" : "") + dayChg.toFixed(1) + "%)."
+            : "Falling today (" + dayChg.toFixed(1) + "%) — wait for a steady or green close."
+        },
+        {
+          ok: moneyOk,
+          text: moneyOk ? "Money flow (OBV) is not leaving." : "Money flow is leaving — do not buy into selling."
         },
         {
           ok: pastOk,
           text: pastOk
-            ? "This stock’s past on this kind of setup paid."
+            ? "Historical estimate paid (" + (b.wr != null ? b.wr + "% win rate, " + b.n + " setups" : "positive") + ")."
             : pastBad
-              ? "This stock’s past on this kind of setup lost more than it won."
-              : "Not enough past trades to trust — treat as wait."
+              ? "Historical estimate lost too often (" + (b.wr != null ? b.wr + "% win rate" : "weak") + ")."
+              : "Historical estimate is a coin flip or thin (<10 setups) — wait."
         },
         {
-          ok: moneyOk,
-          text: moneyOk ? "Money flow is not leaving." : "Money is leaving — skip or size tiny."
-        },
-        {
-          ok: cool,
-          text: cool ? "Not overheated." : "Too hot right now — wait for a cooler pullback."
-        },
-        {
-          ok: noEarn,
-          text: noEarn ? "No earnings in the next few days." : "Earnings soon — wait for the report."
+          ok: cool && noEarn,
+          text: !noEarn
+            ? "Earnings soon — wait for the report."
+            : cool
+              ? "RSI in healthy range (" + (d.rsi == null ? "—" : d.rsi.toFixed(0)) + ", not overheated)."
+              : "RSI outside entry range (" + (d.rsi == null ? "—" : d.rsi.toFixed(0)) + ")."
         }
       ];
 
       let doThis;
       if (call.flag === "BUY") {
-        doThis = "BUY a small size. Leave if a daily close loses $" + (stopPx ? stopPx.toFixed(2) : "the line") + ".";
+        doThis = "Estimate: EARLY BUY near the " + lineName + ". Stop estimate $" + (stopPx ? stopPx.toFixed(2) : "—") + " (2% under line). Not financial advice.";
       } else if (call.flag === "SELL") {
-        doThis = "Do not own this. Wait for a daily close through $" + (linePx ? linePx.toFixed(2) : "the line") + ", then a hold.";
+        doThis = "Estimate: SELL / SKIP. Wait until price reclaims $" + (linePx ? linePx.toFixed(2) : "the line") + " and holds. Not financial advice.";
       } else {
-        doThis = "WAIT. No buy until every red check is green.";
+        doThis = "Estimate: WAIT. Let price pull back to $" + (linePx ? linePx.toFixed(2) : "the line") + " and turn every check green. Not financial advice.";
       }
 
       return {
@@ -2330,7 +2404,7 @@
       };
     }
 
-    const CALL_HIST_KEY = "finsense_call_hist_v1";
+    const CALL_HIST_KEY = "finsense_call_hist_v2";
 
     function barDay(data, all) {
       const m = (data && data.market) || {};
@@ -2498,26 +2572,43 @@
 
     function timelineHtml(d) {
       const nodes = callTimeline(d);
+      // First mark only — keep expand short; no side-by-side date that wraps over the price
+      if (nodes.length === 1) {
+        const n = nodes[0];
+        const lab = flagWord(n.flag);
+        const cls = flagClass(n.flag);
+        const pct = n.livePct == null
+          ? ""
+          : (n.livePct >= 0 ? "+" : "") + n.livePct.toFixed(1) + "% since mark";
+        return `<div class="tl">
+          <div class="tl-title">Call</div>
+          <ol><li class="${cls}">
+            <span class="lab ${cls}">${lab}</span>
+            <span class="dt">Since ${shortDay(n.date)}</span>
+            <span class="pxrow">Marked @ $${(+n.price).toFixed(2)}</span>
+            ${pct ? `<span class="pxrow">Now $${(+n.livePrice).toFixed(2)} · ${pct}</span>` : ""}
+          </li></ol>
+        </div>`;
+      }
       const items = nodes.map((n, i) => {
         const lab = flagWord(n.flag);
         const cls = flagClass(n.flag);
         const start = shortDay(n.date);
         const end = n.now ? "now" : shortDay(n.endDate || n.date);
-        const range = n.first && nodes.length === 1
-          ? `since ${start}`
-          : (n.now ? `${start} → now` : `${start} → ${end}`);
         let edge = "";
         if (i > 0 && n.pct != null) {
           const ecls = n.pct > 0.05 ? "up" : n.pct < -0.05 ? "down" : "flat";
           const ep = (n.pct >= 0 ? "+" : "") + n.pct.toFixed(1) + "%";
-          edge = `<div class="edge ${ecls}">↓ ${ep} into this call</div>`;
+          edge = `<div class="edge ${ecls}">↓ ${ep}</div>`;
         }
         const live = n.now && n.livePct != null
-          ? ` · now $${(+n.livePrice).toFixed(2)} (${(n.livePct >= 0 ? "+" : "") + n.livePct.toFixed(1)}% in this call)`
+          ? `<span class="pxrow">Now $${(+n.livePrice).toFixed(2)} · ${(n.livePct >= 0 ? "+" : "") + n.livePct.toFixed(1)}%</span>`
           : "";
-        return `${edge}<li class="${cls}${n.now ? " now" : ""}">
-          <div class="mark"><span class="lab ${cls}">${lab}${n.now ? " · current" : ""}</span><span class="dt">${range}</span></div>
-          <div class="pxrow">@ $${(+n.price).toFixed(2)} when marked${live}</div>
+        return `${edge}<li class="${cls}">
+          <span class="lab ${cls}">${lab}${n.now ? " · current" : ""}</span>
+          <span class="dt">${start} → ${end}</span>
+          <span class="pxrow">Marked @ $${(+n.price).toFixed(2)}</span>
+          ${live}
         </li>`;
       }).join("");
       return `<div class="tl"><div class="tl-title">Call timeline</div><ol>${items}</ol></div>`;
@@ -2672,7 +2763,7 @@
       }).join("");
       grid.innerHTML = `<div class="simple-head">
           <h2>Simple</h2>
-          <p>Two points that matter. Tap a tile for the full timeline and all checks.</p>
+          <p>Early-entry estimator: looks for confirmed holds near the 50/200 line (0–2% above) with steady price, money holding, and proven past win rate — never chasing highs. Statistical estimates only, not financial advice.</p>
         </div>
         ${banner}
         <div class="simple-tools">

@@ -85,6 +85,8 @@ STOP_UNDER_50 = 0.02
 ZONE_PCT = 0.02
 MAX_HOLD = 60
 NEAR_ENTRY_PCT = 0.025
+EARLY_BUY_PCT = 0.020  # max stretch above the held line to still call an early BUY
+STABLE_DAY_FLOOR = -0.0075  # do not call BUY on a day closing down >0.75% (falling knife)
 HORIZON_3M = 63       # ~3 months of sessions — path study, not the 60-day trade clock
 HORIZON_6M = 126      # ~6 months of sessions
 BOOK_MIN = 10         # closed trades before an 80% name-level win rate is worth reading
@@ -105,7 +107,7 @@ EV_K = 1.0             # barrier = k x daily vol x sqrt(horizon), so PG and NVDA
 EV_FLOOR = 0.02        # never use a barrier tighter than 2%
 EV_YEARS = 3           # history window for the record
 MODEL_MIN = 400        # events needed before the model is worth fitting
-ENGINE = "v6"          # per-name books + 3m/6m climb rates on the method tape
+ENGINE = "v7"          # early-entry BUY estimator + closed loopholes + no-advice estimates
 
 # Add extra names here (Yahoo format: BRK-B not BRK.B).
 # Duplicates of S&P 500 names are skipped automatically.
@@ -808,6 +810,8 @@ def pack_of(row: dict) -> dict:
     line_px = row.get("line_px")
     over = None if not line_px else (px - line_px) / line_px * 100
     run = row.get("line_run") or 0
+    day_chg = row.get("day_chg_pct")
+    stabilized = day_chg is None or day_chg >= STABLE_DAY_FLOOR * 100
     held_line = row.get("line_name")
     stair = (row.get("touch_200") if held_line == "200" else row.get("touch_50")) or {}
     checks = [
@@ -818,7 +822,7 @@ def pack_of(row: dict) -> dict:
         },
         {
             "label": "Holding its line",
-            "ok": bool(line_px and px >= line_px * 0.995),
+            "ok": bool(row.get("line_kind") == "support" and line_px and px >= line_px),
             "note": "no line underneath" if not line_px else f"{over:+.1f}% vs the {row.get('line_name')} at ${line_px:,.2f}",
         },
         {
@@ -827,9 +831,14 @@ def pack_of(row: dict) -> dict:
             "note": f"{abs(run)} closes {'above' if run > 0 else 'below'} the line (need {CONFIRM_CLOSES} above)",
         },
         {
-            "label": "Not stretched",
-            "ok": over is not None and over <= HOLD_ZONE * 100 * 2,
-            "note": "no line underneath" if over is None else f"{over:+.1f}% above the line (want under {HOLD_ZONE * 200:.0f}%)",
+            "label": "Early near line (not at highs)",
+            "ok": over is not None and 0 <= over <= EARLY_BUY_PCT * 100,
+            "note": "no line underneath" if over is None else f"{over:+.1f}% above the line (want 0% to +{EARLY_BUY_PCT * 100:.1f}%)",
+        },
+        {
+            "label": "Price stabilized today",
+            "ok": stabilized,
+            "note": "steady close" if day_chg is None else f"last bar {day_chg:+.2f}% (need >= {STABLE_DAY_FLOOR * 100:.2f}%)",
         },
         {
             "label": "Dip flag says buy",
@@ -1383,6 +1392,9 @@ def classify(
     gap_pct = (s50 - s200) / s200 * 100.0
     lookback = min(SLOPE_LOOKBACK, len(sma50) - 1)
     rising = bool(s50 > sma50.iloc[-1 - lookback])
+    rising200 = bool(s200 > sma200.iloc[-1 - lookback])
+    prev_gap_pct = (prev50 - prev200) / prev200 * 100.0 if prev200 else gap_pct
+    gap_shrinking = bool(gap_pct < prev_gap_pct)
     golden_today = bool((prev50 <= prev200) and (s50 > s200))
     death_today = bool((prev50 >= prev200) and (s50 < s200))
     crossed = (sma50 > sma200) & (sma50.shift(1) <= sma200.shift(1))
@@ -1390,6 +1402,7 @@ def classify(
     days_since = (close.index[-1] - last_cross).days if pd.notna(last_cross) else None
     recent = days_since is not None and days_since <= RECENT_DAYS and s50 > s200
     reg = regime(float(px), float(s50), float(s200))
+    day_chg_pct = round((float(px) / float(close.iloc[-2]) - 1.0) * 100.0, 2) if len(close) >= 2 and float(close.iloc[-2]) else 0.0
 
     if golden_today:
         signal = "GOLDEN_TODAY"
@@ -1399,7 +1412,13 @@ def classify(
         signal = "NEAR_GOLDEN"
     elif death_today:
         signal = "DEATH_TODAY"
-    elif s50 > s200 and abs(gap_pct) <= close_pct and not rising:
+    elif (
+        s50 > s200
+        and abs(gap_pct) <= close_pct
+        and not rising
+        and gap_shrinking
+        and float(px) < float(s50)
+    ):
         signal = "NEAR_DEATH"
     else:
         signal = {"bull": "BULL", "repairing": "REPAIRING", "mixed": "MIXED", "bear": "BEAR"}[reg]
@@ -1411,6 +1430,8 @@ def classify(
         "sma200": round(float(s200), 2),
         "gap_pct": round(float(gap_pct), 2),
         "sma50_rising": rising,
+        "sma200_rising": rising200,
+        "day_chg_pct": day_chg_pct,
         "days_since_golden": None if days_since is None else int(days_since),
         "rsi": None if (r := rsi_wilder(close)) is None else round(r, 1),
         "regime": reg,
@@ -1438,15 +1459,30 @@ def classify(
     row.update(obv_tape(close, volume))
     row["rs_60"] = rel_strength(close, bench)
 
-    # The line the plan hangs on: what price is standing on, else the ceiling above it.
-    plan = support or resist
+    # The line the plan hangs on:
+    # - In TEST or AVOID, the active line is the overhead ceiling being tested.
+    # - Otherwise, what price is standing on (support), else the ceiling above it.
+    if row["stage"] in ("TEST", "AVOID") and resist:
+        plan = resist
+        plan_kind = "ceiling"
+    elif support:
+        plan = support
+        plan_kind = "support"
+    elif resist:
+        plan = resist
+        plan_kind = "ceiling"
+    else:
+        plan = None
+        plan_kind = None
     row["line_name"] = None if not plan else plan[0]
     row["line_px"] = None if not plan else round(plan[1], 2)
-    row["line_kind"] = "support" if support else ("ceiling" if resist else None)
+    row["line_kind"] = plan_kind
+    row["support_name"] = None if not support else support[0]
+    row["support_px"] = None if not support else round(support[1], 2)
     row["ceiling_name"] = None if not resist else resist[0]
     row["ceiling_px"] = None if not resist else round(resist[1], 2)
-    row["line_run"] = 0 if not support else line_run(close, series[support[0]])
-    row["confirmed_break"] = bool(support and row["line_run"] >= CONFIRM_CLOSES)
+    row["line_run"] = 0 if not plan else line_run(close, series[plan[0]])
+    row["confirmed_break"] = bool(plan_kind == "support" and row["line_run"] >= CONFIRM_CLOSES)
 
     coil_line = series[resist[0]] if resist else series[support[0]] if support else None
     if coil_line is not None:
